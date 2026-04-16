@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 font-body;
+  background-image: radial-gradient(circle at top, rgba(234, 88, 12, 0.18), transparent 35%),
+    linear-gradient(to bottom, #020617, #0f172a 40%, #020617);
+  min-height: 100vh;
+}
+
+html.light body {
+  background-image: radial-gradient(circle at top, rgba(251, 146, 60, 0.22), transparent 30%),
+    linear-gradient(to bottom, #fff7ed, #f8fafc 45%, #eff6ff);
+  color: #0f172a;
+}
+
+.panel {
+  @apply rounded-3xl border border-white/10 bg-white/5 backdrop-blur;
+}
+
+html.light .panel {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
+}
+
+.section-title {
+  @apply text-2xl font-semibold font-display tracking-tight text-white;
+}
+
+html.light .section-title {
+  color: #0f172a;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-slate-300,
+html.light .text-slate-400,
+html.light .text-slate-500 {
+  color: #334155 !important;
+}
+
+html.light .bg-slate-950,
+html.light .bg-slate-900 {
+  background-color: #fff7ed !important;
+}
+
+html.light .bg-slate-950\/85,
+html.light .bg-slate-950\/95,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-900\/40 {
+  background-color: rgba(255, 247, 237, 0.92) !important;
+}
+
+html.light .bg-white\/5 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html.light .border-white\/10,
+html.light .border-white\/15 {
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html.light .text-orange-300,
+html.light .text-orange-200 {
+  color: #c2410c !important;
+}
+
+html.light .text-rose-300 {
+  color: #be123c !important;
+}
+
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light input,
+html.light textarea,
+html.light select {
+  color: #0f172a !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #64748b !important;
+}
+
+html.light header,
+html.light footer {
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html.light .bg-orange-500.text-white,
+html.light .bg-green-600.text-white,
+html.light .bg-red-600.text-white,
+html.light .bg-rose-600.text-white,
+html.light .bg-emerald-600.text-white {
+  color: #ffffff !important;
+}
+
+html.light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+html.light .ad-card {
+  background: linear-gradient(135deg, rgba(255, 237, 213, 0.96), rgba(255, 255, 255, 0.98)) !important;
+  border-color: rgba(249, 115, 22, 0.18) !important;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+html.light .ad-card-title {
+  color: #111827 !important;
+}
+
+html.light .ad-card-description,
+html.light .ad-card-meta {
+  color: #475569 !important;
+}
+
+html.light .ad-card-pill,
+html.light .ad-empty-kicker {
+  color: #c2410c !important;
+}
+
+html.light .ad-card-cta {
+  background-color: #111827 !important;
+  color: #ffffff !important;
+}
+
+html.light .ad-empty-slot {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(249, 115, 22, 0.18) !important;
+}
+
+html.light .ad-empty-title {
+  color: #111827 !important;
+}
+
+html.light .ad-empty-description {
+  color: #475569 !important;
+}
+
+.ticker-track {
+  width: max-content;
+  animation: ticker-scroll 28s linear infinite;
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes audio-wave-pulse {
+  from {
+    transform: scaleY(0.7);
+    filter: brightness(0.95);
+  }
+  to {
+    transform: scaleY(1.22);
+    filter: brightness(1.15);
+  }
+}
+
+.voice-desk-scroll {
+  max-height: calc(100vh - 7rem);
+  overflow-y: auto;
+}
+
+@media (min-width: 640px) {
+  .voice-desk-scroll {
+    max-height: calc(100vh - 5rem);
+  }
+}
