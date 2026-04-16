@@ -20,6 +20,7 @@ export const AudioStoryPlayer = ({
   const [analysisEnabled, setAnalysisEnabled] = useState(true);
   const label = title || article?.title || "Voice bulletin";
   const hasAudio = Boolean(article?.audioUrl);
+  const fallbackDuration = Number(article?.audioDuration) || 0;
 
   const fallbackWaveform = useMemo(() => article?.audioWaveform || [], [article?.audioWaveform]);
   const waveform = liveWaveform.length ? liveWaveform : fallbackWaveform;
@@ -164,7 +165,10 @@ export const AudioStoryPlayer = ({
         src={article.audioUrl}
         crossOrigin="anonymous"
         preload="metadata"
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || Number(article?.audioDuration) || 0)}
+        onLoadedMetadata={(event) => {
+          const metadataDuration = Number(event.currentTarget.duration);
+          setDuration(Number.isFinite(metadataDuration) && metadataDuration > 0 ? metadataDuration : fallbackDuration);
+        }}
         onEnded={() => {
           setPlaying(false);
           stopAnalyser();

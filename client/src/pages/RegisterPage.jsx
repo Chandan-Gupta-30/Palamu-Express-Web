@@ -109,8 +109,8 @@ export const RegisterPage = () => {
     setSubmitting(true);
     setPopup({
       type: "loading",
-      title: "Submitting enrollment",
-      message: "We are uploading your onboarding details and creating your newsroom profile.",
+      title: "Registering new user",
+      message: "We are uploading the onboarding details, creating the account, and preparing verification for this new user.",
       persistent: true,
     });
 
@@ -182,9 +182,6 @@ export const RegisterPage = () => {
           <h1 className="font-display text-3xl text-white">Enrollment Portal</h1>
           <p className="mt-2 text-sm text-slate-500">
             Reporter KYC and chief editor enrollment in one unified onboarding form.
-          </p>
-          <p className="mt-3 text-sm text-slate-400">
-            Already registered? <Link to="/login" className="font-semibold text-orange-300 transition hover:text-orange-200">Login</Link>
           </p>
           {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
           {message ? <p className="mt-3 text-sm text-green-400">{message}</p> : null}
@@ -297,6 +294,9 @@ export const RegisterPage = () => {
         <button disabled={submitting} className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white disabled:opacity-60 md:col-span-2">
           {submitting ? "Submitting..." : "Submit Enrollment"}
         </button>
+        <div className="text-center text-sm text-slate-400 md:col-span-2">
+          Already registered? <Link to="/login" className="font-semibold text-orange-300 transition hover:text-orange-200">Login</Link>
+        </div>
       </form>
     </div>
   );
