@@ -43,8 +43,8 @@ const AdCard = ({ ad, compact = false }) => (
     className={`ad-card group block overflow-hidden rounded-3xl border border-orange-400/20 bg-gradient-to-br from-orange-500/10 via-slate-900 to-slate-950 ${compact ? "h-full" : ""}`}
   >
     {ad.imageUrl ? (
-      <div className={compact ? "aspect-[16/10] overflow-hidden" : "aspect-[16/9] overflow-hidden"}>
-        <img src={ad.imageUrl} alt={ad.title} className="h-full w-full object-cover object-center transition duration-300 group-hover:scale-[1.02]" />
+      <div className={compact ? "aspect-[16/10] overflow-hidden bg-slate-950/60 p-3" : "aspect-[16/9] overflow-hidden bg-slate-950/60 p-4"}>
+        <img src={ad.imageUrl} alt={ad.title} className="h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.02]" />
       </div>
     ) : null}
     <div className="space-y-3 p-5">
