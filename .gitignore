@@ -2,9 +2,16 @@ node_modules
 dist
 build
 .env
+.env.*
+!.env.example
+client/.env
+client/.env.*
+!client/.env.example
+server/.env
+server/.env.*
+!server/.env.example
 .DS_Store
 coverage
 *.log
 client/node_modules
 server/node_modules
-
