@@ -24,8 +24,6 @@ const assignStaffIdentityArtifacts = async (user) => {
     return;
   }
 
-  user.reporterCode = undefined;
-  user.chiefEditorCode = undefined;
   user.idCardUrl = undefined;
 };
 
@@ -198,8 +196,6 @@ export const updateUserByAdmin = asyncHandler(async (req, res) => {
   if (user.approvalStatus === approvalStatuses.APPROVED) {
     await assignStaffIdentityArtifacts(user);
   } else {
-    user.reporterCode = undefined;
-    user.chiefEditorCode = undefined;
     if (![roles.REPORTER, roles.CHIEF_EDITOR].includes(user.role) || user.approvalStatus !== approvalStatuses.APPROVED) {
       user.idCardUrl = undefined;
     }

@@ -17,6 +17,7 @@ export const AudioStoryPlayer = ({
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(Number(article?.audioDuration) || 0);
   const [liveWaveform, setLiveWaveform] = useState([]);
+  const [analysisEnabled, setAnalysisEnabled] = useState(true);
   const label = title || article?.title || "Voice bulletin";
   const hasAudio = Boolean(article?.audioUrl);
 
@@ -96,11 +97,13 @@ export const AudioStoryPlayer = ({
       sample();
     } catch (_) {
       setLiveWaveform([]);
+      setAnalysisEnabled(false);
     }
   };
 
   useEffect(() => {
     setLiveWaveform([]);
+    setAnalysisEnabled(true);
     return () => {
       cleanupAudioAnalysis();
     };
@@ -159,6 +162,7 @@ export const AudioStoryPlayer = ({
       <audio
         ref={audioRef}
         src={article.audioUrl}
+        crossOrigin="anonymous"
         preload="metadata"
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || Number(article?.audioDuration) || 0)}
         onEnded={() => {
@@ -173,7 +177,14 @@ export const AudioStoryPlayer = ({
         }}
         onPlay={() => {
           setPlaying(true);
-          beginAudioAnalysis();
+          if (analysisEnabled) {
+            beginAudioAnalysis();
+          }
+        }}
+        onError={() => {
+          setPlaying(false);
+          cleanupAudioAnalysis();
+          setAnalysisEnabled(false);
         }}
         className="hidden"
       />

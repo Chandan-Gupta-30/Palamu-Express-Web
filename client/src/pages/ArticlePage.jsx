@@ -4,6 +4,7 @@ import { Bookmark } from "lucide-react";
 import { http } from "../api/http";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { ShareBar } from "../components/news/ShareBar";
+import { ActionPopup } from "../components/ui/ActionPopup";
 import { useSocket } from "../hooks/useSocket";
 import { useAuth } from "../context/AuthContext";
 
@@ -27,6 +28,7 @@ export const ArticlePage = () => {
   const [summaryError, setSummaryError] = useState("");
   const [bookmarkMessage, setBookmarkMessage] = useState("");
   const [summaryReplayToken, setSummaryReplayToken] = useState(0);
+  const [actionPopup, setActionPopup] = useState(null);
   const { pageViews } = useSocket(slug);
 
   useEffect(() => {
@@ -121,6 +123,14 @@ export const ArticlePage = () => {
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-10">
+      <ActionPopup
+        open={Boolean(actionPopup)}
+        type={actionPopup?.type}
+        title={actionPopup?.title}
+        message={actionPopup?.message}
+        persistent={actionPopup?.persistent}
+        onClose={actionPopup?.persistent ? undefined : () => setActionPopup(null)}
+      />
       <div className="space-y-3">
         <p className="text-sm uppercase tracking-[0.3em] text-orange-300">
           {article.district} • {article.area}
@@ -235,7 +245,16 @@ export const ArticlePage = () => {
         </div>
       ) : null}
 
-      <ShareBar url={articleUrl} title={article.title} />
+      <ShareBar
+        url={articleUrl}
+        title={article.title}
+        onCopy={({ type, message }) =>
+          setActionPopup({
+            type,
+            title: type === "success" ? "Link copied" : "Copy failed",
+            message,
+          })}
+      />
     </div>
   );
 };

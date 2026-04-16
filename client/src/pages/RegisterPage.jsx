@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { http } from "../api/http";
 import { ImagePicker } from "../components/onboarding/ImagePicker";
@@ -182,6 +182,9 @@ export const RegisterPage = () => {
           <h1 className="font-display text-3xl text-white">Enrollment Portal</h1>
           <p className="mt-2 text-sm text-slate-500">
             Reporter KYC and chief editor enrollment in one unified onboarding form.
+          </p>
+          <p className="mt-3 text-sm text-slate-400">
+            Already registered? <Link to="/login" className="font-semibold text-orange-300 transition hover:text-orange-200">Login</Link>
           </p>
           {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
           {message ? <p className="mt-3 text-sm text-green-400">{message}</p> : null}
