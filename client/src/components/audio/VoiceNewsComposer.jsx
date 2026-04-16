@@ -466,7 +466,12 @@ export const VoiceNewsComposer = ({
       onClose?.();
       resetComposer();
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Voice news could not be saved.");
+      const rawMessage = requestError.response?.data?.message || "Voice news could not be saved.";
+      setError(
+        rawMessage.includes("Unsupported source URL")
+          ? "Voice recording upload failed. Please record again and then publish once more."
+          : rawMessage
+      );
     } finally {
       setSubmitting(false);
     }
@@ -737,7 +742,7 @@ export const VoiceNewsComposer = ({
               </div>
 
               {error ? (
-                <div className="mt-4 rounded-2xl border border-rose-400/40 bg-rose-500/15 px-4 py-3 text-sm text-rose-100">
+                <div className="mt-4 break-words rounded-2xl border border-rose-400/40 bg-rose-500/15 px-4 py-3 text-sm leading-6 text-rose-100">
                   {error}
                 </div>
               ) : null}
