@@ -88,6 +88,7 @@ export const HomePage = () => {
   const [latestPage, setLatestPage] = useState(1);
   const [feedLoading, setFeedLoading] = useState(false);
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [tickerCycle, setTickerCycle] = useState(0);
   const featured = useMemo(() => {
     const breakingArticleIds = new Set(feed.breaking.map((article) => article._id));
     return feed.latest.find((article) => breakingArticleIds.has(article._id)) || feed.latest[0] || feed.breaking[0];
@@ -109,6 +110,25 @@ export const HomePage = () => {
   useEffect(() => {
     setLatestPage(1);
   }, [selectedDate]);
+
+  useEffect(() => {
+    if (!feed.breaking.length) return undefined;
+
+    const restartTicker = () => {
+      window.requestAnimationFrame(() => {
+        setTickerCycle((value) => value + 1);
+      });
+    };
+
+    restartTicker();
+    window.addEventListener("resize", restartTicker);
+    window.addEventListener("orientationchange", restartTicker);
+
+    return () => {
+      window.removeEventListener("resize", restartTicker);
+      window.removeEventListener("orientationchange", restartTicker);
+    };
+  }, [feed.breaking.length]);
 
   const tickerItems = useMemo(() => {
     const items = [...feed.breaking].slice(0, 10);
@@ -222,8 +242,8 @@ export const HomePage = () => {
           <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white">
             Live Headlines
           </span>
-          <div className="overflow-hidden">
-            <div className="ticker-track flex gap-8 whitespace-nowrap">
+            <div className="overflow-hidden">
+            <div key={tickerCycle} className="ticker-track flex gap-8 whitespace-nowrap">
               {tickerItems.map((article, index) => (
                 <Link key={`${article._id}-${index}`} to={`/article/${article.slug}`} className="text-sm text-slate-200">
                   {article.title}

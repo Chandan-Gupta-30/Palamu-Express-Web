@@ -25,6 +25,7 @@ export const AudioWaveform = ({
             opacity: active ? 0.55 + ((index % 5) / 10) : 0.85,
             transformOrigin: "center bottom",
             transform: active ? `scaleY(${1 + ((index % 4) * 0.02)})` : "scaleY(1)",
+            animation: active ? `audio-wave-pulse ${0.78 + ((index % 6) * 0.12)}s ease-in-out ${index * 0.04}s infinite alternate` : "none",
           }}
         />
       ))}

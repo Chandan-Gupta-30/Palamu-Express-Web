@@ -150,8 +150,10 @@ html.light .ad-empty-description {
 }
 
 .ticker-track {
+  display: inline-flex;
   width: max-content;
   animation: ticker-scroll 28s linear infinite;
+  will-change: transform;
 }
 
 @keyframes ticker-scroll {
