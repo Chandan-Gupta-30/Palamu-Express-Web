@@ -5,6 +5,7 @@ import { VoiceNewsComposer } from "../components/audio/VoiceNewsComposer";
 import { MetricCard } from "../components/dashboard/MetricCard";
 import { ImagePicker } from "../components/onboarding/ImagePicker";
 import { WebcamCapture } from "../components/onboarding/WebcamCapture";
+import { ActionPopup } from "../components/ui/ActionPopup";
 import { useAuth } from "../context/AuthContext";
 import { http } from "../api/http";
 import { jharkhandBlocksByDistrict, jharkhandDistricts } from "../data/districts";
@@ -131,19 +132,6 @@ const ManagedImagePreview = ({ title, src, alt }) => (
         No image available
       </div>
     )}
-  </div>
-);
-
-const DashboardToast = ({ type, message }) => (
-  <div
-    className={`pointer-events-auto min-w-[280px] max-w-sm rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur ${
-      type === "error"
-        ? "border-rose-400/40 bg-rose-500/15 text-rose-100"
-        : "border-green-400/40 bg-green-500/15 text-green-100"
-    }`}
-  >
-    <p className="text-sm font-semibold">{type === "error" ? "Action Required" : "Success"}</p>
-    <p className="mt-1 text-sm leading-6">{message}</p>
   </div>
 );
 
@@ -304,8 +292,7 @@ export const DashboardPage = () => {
   const [articleForm, setArticleForm] = useState(initialArticleForm);
   const [adForm, setAdForm] = useState(initialAdForm);
   const [feedbacks, setFeedbacks] = useState({});
-  const [statusMessage, setStatusMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [actionPopup, setActionPopup] = useState(null);
   const [editingArticleId, setEditingArticleId] = useState("");
   const [editingAdId, setEditingAdId] = useState("");
   const [editingManagedUserId, setEditingManagedUserId] = useState("");
@@ -386,13 +373,26 @@ export const DashboardPage = () => {
   );
 
   const handleAction = async (action, successMessage) => {
-    setErrorMessage("");
     setBusyAction(successMessage);
+    setActionPopup({
+      type: "loading",
+      title: "Updating dashboard",
+      message: "Please wait while we complete this newsroom action.",
+      persistent: true,
+    });
     try {
       await action();
-      setStatusMessage(successMessage);
+      setActionPopup({
+        type: "success",
+        title: "Action completed",
+        message: successMessage,
+      });
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Action failed");
+      setActionPopup({
+        type: "error",
+        title: "Action failed",
+        message: error.response?.data?.message || "Action failed",
+      });
     } finally {
       setBusyAction("");
     }
@@ -466,15 +466,6 @@ export const DashboardPage = () => {
     if (!user || !["super_admin", "chief_editor"].includes(user.role)) return;
     refreshPublishedArchive(publishedArchiveDate);
   }, [publishedArchiveDate, user]);
-
-  useEffect(() => {
-    if (!statusMessage && !errorMessage) return undefined;
-    const timer = setTimeout(() => {
-      setStatusMessage("");
-      setErrorMessage("");
-    }, 3500);
-    return () => clearTimeout(timer);
-  }, [statusMessage, errorMessage]);
 
   useEffect(() => {
     if (!profile) return;
@@ -638,11 +629,14 @@ export const DashboardPage = () => {
       refreshPublishedArchive();
     }
 
-    setStatusMessage(
-      user?.role === "reporter"
-        ? "Voice news submitted for editorial review."
-        : "Voice news published successfully."
-    );
+    setActionPopup({
+      type: "success",
+      title: "Voice news ready",
+      message:
+        user?.role === "reporter"
+          ? "Voice news submitted for editorial review."
+          : "Voice news published successfully.",
+    });
   };
 
   const startEditArticle = (article) => {
@@ -841,20 +835,32 @@ export const DashboardPage = () => {
 
   const deletePublishedArticlesForDate = async () => {
     if (!publishedArchiveDate) {
-      setStatusMessage("");
-      setErrorMessage("Choose a published date before deleting archived news");
+      setActionPopup({
+        type: "error",
+        title: "Date required",
+        message: "Choose a published date before deleting archived news.",
+      });
       return;
     }
 
     setArchiveBusy(true);
-    setErrorMessage("");
+    setActionPopup({
+      type: "loading",
+      title: "Deleting archive",
+      message: "We are removing the selected published news archive from the homepage records.",
+      persistent: true,
+    });
 
     try {
       const { data } = await http.delete("/articles/published/archive", {
         params: { date: publishedArchiveDate },
       });
 
-      setStatusMessage(data.message || "Published news archive cleared.");
+      setActionPopup({
+        type: "success",
+        title: "Archive deleted",
+        message: data.message || "Published news archive cleared.",
+      });
       refreshPublishedArchive();
       if (user?.role === "super_admin") {
         refreshAdminData();
@@ -865,7 +871,11 @@ export const DashboardPage = () => {
         refreshMyArticles();
       }
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to delete published news for the selected date");
+      setActionPopup({
+        type: "error",
+        title: "Deletion failed",
+        message: error.response?.data?.message || "Unable to delete published news for the selected date",
+      });
     } finally {
       setArchiveBusy(false);
     }
@@ -873,14 +883,20 @@ export const DashboardPage = () => {
 
   const requestPublishedArchiveDelete = () => {
     if (!publishedArchiveDate) {
-      setStatusMessage("");
-      setErrorMessage("Choose a published date before deleting archived news");
+      setActionPopup({
+        type: "error",
+        title: "Date required",
+        message: "Choose a published date before deleting archived news.",
+      });
       return;
     }
 
     if (!publishedArchiveArticles.length) {
-      setStatusMessage("");
-      setErrorMessage("No published articles are available for the selected date");
+      setActionPopup({
+        type: "error",
+        title: "Nothing to delete",
+        message: "No published articles are available for the selected date.",
+      });
       return;
     }
 
@@ -903,38 +919,57 @@ export const DashboardPage = () => {
     event.preventDefault();
 
     if (!String(credentialForm.fullName || "").trim()) {
-      setStatusMessage("");
-      setErrorMessage("Full name is required");
+      setActionPopup({
+        type: "error",
+        title: "Full name required",
+        message: "Please enter your full name before updating credentials.",
+      });
       return;
     }
 
     if (!/^\d{10}$/.test(String(credentialForm.phone || "").trim())) {
-      setStatusMessage("");
-      setErrorMessage("Phone number must be exactly 10 digits");
+      setActionPopup({
+        type: "error",
+        title: "Invalid phone number",
+        message: "Phone number must be exactly 10 digits.",
+      });
       return;
     }
 
     if (String(credentialForm.email || "").trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(credentialForm.email || "").trim())) {
-      setStatusMessage("");
-      setErrorMessage("Enter a valid email address");
+      setActionPopup({
+        type: "error",
+        title: "Invalid email",
+        message: "Enter a valid email address.",
+      });
       return;
     }
 
     if (credentialForm.newPassword && credentialForm.newPassword.length < 6) {
-      setStatusMessage("");
-      setErrorMessage("New password must be at least 6 characters");
+      setActionPopup({
+        type: "error",
+        title: "Password too short",
+        message: "New password must be at least 6 characters.",
+      });
       return;
     }
 
     if (credentialForm.newPassword && credentialForm.newPassword !== credentialForm.confirmNewPassword) {
-      setErrorMessage("New password and confirm password must match");
-      setStatusMessage("");
+      setActionPopup({
+        type: "error",
+        title: "Password mismatch",
+        message: "New password and confirm password must match.",
+      });
       return;
     }
 
     setCredentialBusy(true);
-    setErrorMessage("");
-    setStatusMessage("");
+    setActionPopup({
+      type: "loading",
+      title: "Updating credentials",
+      message: "We are saving your new account details securely.",
+      persistent: true,
+    });
 
     try {
       const payload = {
@@ -959,9 +994,17 @@ export const DashboardPage = () => {
       setShowCurrentPassword(false);
       setShowNewPassword(false);
       setShowConfirmPassword(false);
-      setStatusMessage(data.message || "Account credentials updated.");
+      setActionPopup({
+        type: "success",
+        title: "Credentials updated",
+        message: data.message || "Account credentials updated.",
+      });
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to update account credentials");
+      setActionPopup({
+        type: "error",
+        title: "Update failed",
+        message: error.response?.data?.message || "Unable to update account credentials",
+      });
     } finally {
       setCredentialBusy(false);
     }
@@ -969,6 +1012,14 @@ export const DashboardPage = () => {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
+      <ActionPopup
+        open={Boolean(actionPopup)}
+        type={actionPopup?.type}
+        title={actionPopup?.title}
+        message={actionPopup?.message}
+        persistent={actionPopup?.persistent}
+        onClose={actionPopup?.persistent ? undefined : () => setActionPopup(null)}
+      />
       <ConfirmActionModal
         open={showArchiveDeleteModal}
         title="Delete published news for the selected date"
@@ -982,12 +1033,6 @@ export const DashboardPage = () => {
         }}
         onConfirm={confirmPublishedArchiveDelete}
       />
-      {(statusMessage || errorMessage) ? (
-        <div className="pointer-events-none fixed right-4 top-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-3">
-          {statusMessage ? <DashboardToast type="success" message={statusMessage} /> : null}
-          {errorMessage ? <DashboardToast type="error" message={errorMessage} /> : null}
-        </div>
-      ) : null}
       <VoiceNewsComposer
         open={showVoiceDesk}
         onClose={closeVoiceDesk}
@@ -998,44 +1043,48 @@ export const DashboardPage = () => {
         onSubmitted={handleVoiceNewsSubmitted}
       />
       {showDashboardActions ? (
-        <div className="fixed inset-x-4 bottom-4 z-[70] flex flex-col gap-3 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-auto sm:max-w-sm">
-          <button
-            type="button"
-            onClick={openVoiceDesk}
-            className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-emerald-300/30 bg-slate-950/95 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_55px_rgba(5,150,105,0.34)] backdrop-blur transition hover:border-emerald-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start"
-            aria-label="Open voice news recorder"
-          >
-            <Mic className="h-5 w-5 text-emerald-300" />
-            <span>Record Voice News</span>
-          </button>
-          <button
-            type="button"
-            onClick={openCredentialForm}
-            className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-orange-900/30 transition hover:bg-orange-400 sm:w-auto sm:justify-start"
-          >
-            <KeyRound size={18} />
-            Update Credentials
-          </button>
-          <button
-            type="button"
-            onClick={openReporterDesk}
-            className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-950/30 transition hover:bg-emerald-500 sm:w-auto sm:justify-start"
-          >
-            <FilePlus2 size={18} />
-            {user?.role === "super_admin" ? "Publish News" : "Add News"}
-          </button>
-          {showReporterCardAction ? (
-            <a
-              href={reporterCardUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-2xl shadow-slate-950/20 transition hover:bg-slate-100 sm:w-auto sm:justify-start"
+        <>
+          <div className="fixed bottom-4 left-4 z-[70] flex flex-col gap-3 sm:bottom-6 sm:left-6">
+            <button
+              type="button"
+              onClick={openCredentialForm}
+              className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full bg-orange-500 px-4 py-3 text-[13px] font-semibold text-white shadow-2xl shadow-orange-900/30 transition hover:bg-orange-400 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
             >
-              <IdCard size={18} />
-              {user?.role === "chief_editor" ? "Chief Editor ID Card" : "Reporter ID Card"}
-            </a>
-          ) : null}
-        </div>
+              <KeyRound size={18} />
+              Update Credentials
+            </button>
+            {showReporterCardAction ? (
+              <a
+                href={reporterCardUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full bg-white px-4 py-3 text-[13px] font-semibold text-slate-900 shadow-2xl shadow-slate-950/20 transition hover:bg-slate-100 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
+              >
+                <IdCard size={18} />
+                {user?.role === "chief_editor" ? "Chief Editor ID Card" : "Reporter ID Card"}
+              </a>
+            ) : null}
+          </div>
+          <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-3 sm:bottom-6 sm:right-6">
+            <button
+              type="button"
+              onClick={openReporterDesk}
+              className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full bg-emerald-600 px-4 py-3 text-[13px] font-semibold text-white shadow-2xl shadow-emerald-950/30 transition hover:bg-emerald-500 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
+            >
+              <FilePlus2 size={18} />
+              {user?.role === "super_admin" ? "Publish News" : "Add News"}
+            </button>
+            <button
+              type="button"
+              onClick={openVoiceDesk}
+              className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full border border-emerald-300/30 bg-slate-950/95 px-4 py-3 text-[13px] font-semibold text-white shadow-[0_20px_55px_rgba(5,150,105,0.34)] backdrop-blur transition hover:border-emerald-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
+              aria-label="Open voice news recorder"
+            >
+              <Mic className="h-5 w-5 text-emerald-300" />
+              <span>Record News</span>
+            </button>
+          </div>
+        </>
       ) : null}
       <div>
         <p className="text-sm uppercase tracking-[0.3em] text-orange-300">Dashboard</p>

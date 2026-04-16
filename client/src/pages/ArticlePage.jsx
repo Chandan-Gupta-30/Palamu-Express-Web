@@ -22,18 +22,50 @@ export const ArticlePage = () => {
   const { user, refreshUser } = useAuth();
   const [article, setArticle] = useState(null);
   const [summary, setSummary] = useState("");
+  const [displayedSummary, setDisplayedSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
   const [bookmarkMessage, setBookmarkMessage] = useState("");
+  const [summaryReplayToken, setSummaryReplayToken] = useState(0);
   const { pageViews } = useSocket(slug);
 
   useEffect(() => {
     http.get(`/articles/${slug}`).then(({ data }) => {
       setArticle(data.article);
       setSummary(data.article.aiSummary || "");
+      setDisplayedSummary("");
       setSummaryError("");
     });
   }, [slug]);
+
+  useEffect(() => {
+    if (!summary) {
+      setDisplayedSummary("");
+      return undefined;
+    }
+
+    let cancelled = false;
+    let index = 0;
+    setDisplayedSummary("");
+
+    const tick = () => {
+      if (cancelled) return;
+
+      index += Math.max(1, Math.ceil(summary.length / 120));
+      setDisplayedSummary(summary.slice(0, index));
+
+      if (index < summary.length) {
+        window.setTimeout(tick, 24);
+      }
+    };
+
+    const timer = window.setTimeout(tick, 120);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [summary, summaryReplayToken]);
 
   useEffect(() => {
     if (!article?._id || summary || summaryLoading) return;
@@ -125,11 +157,27 @@ export const ArticlePage = () => {
       <div className="panel p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-xl font-semibold text-white">AI Summary</h2>
-          {!summaryLocked ? (
+          <div className="flex items-center gap-3">
+            {summaryLocked ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">
+                <GeminiIcon className="h-3.5 w-3.5" />
+                Smart cache active
+              </span>
+            ) : null}
             <button
               type="button"
               disabled={summaryLoading}
               onClick={async () => {
+                if (summaryLocked) {
+                  setSummaryError("");
+                  setSummaryLoading(true);
+                  window.setTimeout(() => {
+                    setSummaryReplayToken((value) => value + 1);
+                    setSummaryLoading(false);
+                  }, 650);
+                  return;
+                }
+
                 try {
                   setSummaryLoading(true);
                   setSummaryError("");
@@ -141,6 +189,7 @@ export const ArticlePage = () => {
                   if (lockedSummary) {
                     setSummary(lockedSummary);
                     setArticle((current) => (current ? { ...current, aiSummary: lockedSummary } : current));
+                    setSummaryReplayToken((value) => value + 1);
                   }
                   setSummaryError(error.response?.data?.message || "Live AI summary is unavailable right now.");
                 } finally {
@@ -148,19 +197,17 @@ export const ArticlePage = () => {
                 }
               }}
               className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-orange-300/30 bg-[linear-gradient(135deg,rgba(251,191,36,0.22),rgba(249,115,22,0.22),rgba(255,255,255,0.06))] text-orange-100 shadow-[0_12px_30px_rgba(249,115,22,0.22)] transition hover:scale-[1.03] hover:border-orange-200/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label={summaryLoading ? "Generating AI summary" : "Generate AI summary with Gemini"}
-              title={summaryLoading ? "Generating AI summary" : "Generate AI summary with Gemini"}
+              aria-label={summaryLoading ? "Preparing AI summary" : "Generate AI summary with Gemini"}
+              title={summaryLoading ? "Preparing AI summary" : "Generate AI summary with Gemini"}
             >
               <GeminiIcon className={`h-5 w-5 ${summaryLoading ? "animate-pulse" : ""}`} />
             </button>
-          ) : (
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">
-              <GeminiIcon className="h-3.5 w-3.5" />
-              Summary locked
-            </span>
-          )}
+          </div>
         </div>
-        <p className="mt-4 text-slate-400">{summary || "Generate a quick AI summary for this report."}</p>
+        <p className="mt-4 min-h-24 text-slate-400">
+          {displayedSummary || (summaryLoading ? "Preparing AI summary..." : "Generate a quick AI summary for this report.")}
+          {summaryLoading || (summary && displayedSummary.length < summary.length) ? <span className="ml-1 inline-block h-5 w-[2px] animate-pulse bg-orange-300 align-middle" /> : null}
+        </p>
         {summaryError ? <p className="mt-3 text-sm text-rose-400">{summaryError}</p> : null}
       </div>
 

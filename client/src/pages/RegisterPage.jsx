@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { http } from "../api/http";
 import { ImagePicker } from "../components/onboarding/ImagePicker";
 import { WebcamCapture } from "../components/onboarding/WebcamCapture";
+import { ActionPopup } from "../components/ui/ActionPopup";
 import { jharkhandBlocksByDistrict, jharkhandDistricts } from "../data/districts";
 
 const initialForm = {
@@ -19,22 +20,6 @@ const initialForm = {
   aadhaarImageUrl: "",
   livePhotoUrl: "",
 };
-
-const PopupNotice = ({ title, message, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4">
-    <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-      <p className="text-xs uppercase tracking-[0.24em] text-orange-300">{title}</p>
-      <p className="mt-4 text-base leading-7 text-white">{message}</p>
-      <button
-        type="button"
-        onClick={onClose}
-        className="mt-6 rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white"
-      >
-        Okay
-      </button>
-    </div>
-  </div>
-);
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
@@ -53,7 +38,7 @@ export const RegisterPage = () => {
   };
 
   const showPopup = (title, message) => {
-    setPopup({ title, message });
+    setPopup({ type: "error", title, message });
   };
 
   const validateForm = () => {
@@ -122,13 +107,29 @@ export const RegisterPage = () => {
       return;
     }
     setSubmitting(true);
+    setPopup({
+      type: "loading",
+      title: "Submitting enrollment",
+      message: "We are uploading your onboarding details and creating your newsroom profile.",
+      persistent: true,
+    });
 
     try {
       const { data } = await http.post("/auth/register", form);
       setOtpInfo({ userId: data.user._id, otp: data.developmentOtp });
       setMessage("Registration submitted. Verify the OTP below to complete phone verification.");
+      setPopup({
+        type: "success",
+        title: "Enrollment submitted",
+        message: "Your onboarding form has been saved successfully. Please verify the OTP to complete phone verification.",
+      });
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Registration failed");
+      setPopup({
+        type: "error",
+        title: "Enrollment failed",
+        message: requestError.response?.data?.message || "We could not submit your onboarding form right now.",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -142,17 +143,40 @@ export const RegisterPage = () => {
     if (!otpInfo?.userId || !otp) return;
     setError("");
     try {
+      setPopup({
+        type: "loading",
+        title: "Verifying phone",
+        message: "We are confirming your OTP and finishing the onboarding verification step.",
+        persistent: true,
+      });
       await http.patch(`/auth/verify-phone/${otpInfo.userId}`, { otp });
       setMessage("Phone verified successfully. You can now sign in after admin approval.");
+      setPopup({
+        type: "success",
+        title: "Phone verified",
+        message: "Your phone number is verified successfully. You can sign in after admin approval.",
+      });
       setTimeout(() => navigate("/login"), 1200);
     } catch (requestError) {
       setError(requestError.response?.data?.message || "OTP verification failed");
+      setPopup({
+        type: "error",
+        title: "Verification failed",
+        message: requestError.response?.data?.message || "We could not verify that OTP.",
+      });
     }
   };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      {popup ? <PopupNotice title={popup.title} message={popup.message} onClose={() => setPopup(null)} /> : null}
+      <ActionPopup
+        open={Boolean(popup)}
+        type={popup?.type}
+        title={popup?.title}
+        message={popup?.message}
+        persistent={popup?.persistent}
+        onClose={popup?.persistent ? undefined : () => setPopup(null)}
+      />
       <form onSubmit={handleSubmit} className="panel grid gap-5 p-8 md:grid-cols-2">
         <div className="md:col-span-2">
           <h1 className="font-display text-3xl text-white">Enrollment Portal</h1>
