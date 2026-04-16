@@ -1,7 +1,8 @@
 import axios from "axios";
+import { runtimeConfig } from "../config/runtime";
 
 export const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: runtimeConfig.apiBaseUrl,
 });
 
 http.interceptors.request.use((config) => {
@@ -11,4 +12,3 @@ http.interceptors.request.use((config) => {
   }
   return config;
 });
-
