@@ -345,7 +345,7 @@ export const DashboardPage = () => {
     [adForm.placement]
   );
 
-  const canAccessNewsDesk = profile?.approvalStatus === "approved" && profile?.isPhoneVerified;
+  const canAccessNewsDesk = user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified);
   const canAccessVoiceDesk = user?.role === "super_admin" || canAccessNewsDesk;
   const uniqueMyArticles = useMemo(() => dedupeArticlesById(myArticles), [myArticles]);
   const uniquePendingArticles = useMemo(() => dedupeArticlesById(pendingArticles), [pendingArticles]);
@@ -1182,7 +1182,7 @@ export const DashboardPage = () => {
         Update Credentials
       </button>
 
-      {(user?.role === "reporter" || user?.role === "chief_editor") ? (
+      {(user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin") ? (
         <div className="fixed bottom-6 left-6 z-40 flex flex-col gap-3">
           <button
             type="button"
@@ -1190,7 +1190,7 @@ export const DashboardPage = () => {
             className="inline-flex items-center gap-3 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-950/30 transition hover:bg-emerald-500"
           >
             <FilePlus2 size={18} />
-            Add News
+            {user?.role === "super_admin" ? "Publish News" : "Add News"}
           </button>
           {(user?.role === "reporter" || user?.role === "chief_editor") && reporterCardUrl ? (
             <a
@@ -1206,12 +1206,14 @@ export const DashboardPage = () => {
         </div>
       ) : null}
 
-      {(user?.role === "reporter" || user?.role === "chief_editor") ? (
+      {(user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin") ? (
         <div className="space-y-6">
           {showReporterDesk ? (
             <div id="reporter-desk-panel" className="panel p-6">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-2xl font-semibold text-white">{user?.role === "chief_editor" ? "Chief Editor Desk" : "Reporter Desk"}</h2>
+                <h2 className="text-2xl font-semibold text-white">
+                  {user?.role === "super_admin" ? "Super Admin News Desk" : user?.role === "chief_editor" ? "Chief Editor Desk" : "Reporter Desk"}
+                </h2>
                 <div className="flex flex-wrap gap-3">
                   {editingArticleId ? (
                     <button type="button" onClick={resetArticleForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
@@ -1257,7 +1259,7 @@ export const DashboardPage = () => {
                     Mark as breaking news
                   </label>
                   <button className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white md:col-span-2">
-                    {busyAction ? "Saving..." : editingArticleId ? "Update Article" : "Submit News"}
+                    {busyAction ? "Saving..." : editingArticleId ? "Update Article" : user?.role === "super_admin" ? "Publish News" : "Submit News"}
                   </button>
                 </form>
               )}
