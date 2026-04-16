@@ -2,11 +2,15 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 
-const rootEnvPath = path.resolve(process.cwd(), ".env");
-const serverEnvPath = path.resolve(process.cwd(), "server", ".env");
-const resolvedEnvPath = fs.existsSync(serverEnvPath) ? serverEnvPath : rootEnvPath;
+const candidateEnvPaths = [
+  path.resolve(process.cwd(), ".env"),
+  path.resolve(process.cwd(), "..", ".env"),
+];
+const resolvedEnvPath = candidateEnvPaths.find((candidatePath) => fs.existsSync(candidatePath));
 
-dotenv.config({ path: resolvedEnvPath });
+if (resolvedEnvPath) {
+  dotenv.config({ path: resolvedEnvPath });
+}
 
 export const env = {
   port: process.env.PORT || 5000,
