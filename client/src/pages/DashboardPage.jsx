@@ -347,6 +347,8 @@ export const DashboardPage = () => {
 
   const canAccessNewsDesk = user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified);
   const canAccessVoiceDesk = user?.role === "super_admin" || canAccessNewsDesk;
+  const showDashboardActions = user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin";
+  const showReporterCardAction = (user?.role === "reporter" || user?.role === "chief_editor") && reporterCardUrl;
   const uniqueMyArticles = useMemo(() => dedupeArticlesById(myArticles), [myArticles]);
   const uniquePendingArticles = useMemo(() => dedupeArticlesById(pendingArticles), [pendingArticles]);
   const filteredArticles = uniqueMyArticles.filter((article) => articleStatusFilter === "all" || article.status === articleStatusFilter);
@@ -995,16 +997,45 @@ export const DashboardPage = () => {
         defaultArea={profile?.area || ""}
         onSubmitted={handleVoiceNewsSubmitted}
       />
-      {user ? (
-        <button
-          type="button"
-          onClick={openVoiceDesk}
-          className="fixed bottom-5 right-4 z-[70] inline-flex items-center gap-3 rounded-full border border-emerald-300/30 bg-slate-950/95 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_55px_rgba(5,150,105,0.34)] backdrop-blur transition hover:border-emerald-300/60 hover:bg-slate-900 sm:bottom-6 sm:right-6"
-          aria-label="Open voice news recorder"
-        >
-          <Mic className="h-5 w-5 text-emerald-300" />
-          <span>Record Voice News</span>
-        </button>
+      {showDashboardActions ? (
+        <div className="fixed inset-x-4 bottom-4 z-[70] flex flex-col gap-3 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-auto sm:max-w-sm">
+          <button
+            type="button"
+            onClick={openVoiceDesk}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-emerald-300/30 bg-slate-950/95 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_55px_rgba(5,150,105,0.34)] backdrop-blur transition hover:border-emerald-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start"
+            aria-label="Open voice news recorder"
+          >
+            <Mic className="h-5 w-5 text-emerald-300" />
+            <span>Record Voice News</span>
+          </button>
+          <button
+            type="button"
+            onClick={openCredentialForm}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-orange-900/30 transition hover:bg-orange-400 sm:w-auto sm:justify-start"
+          >
+            <KeyRound size={18} />
+            Update Credentials
+          </button>
+          <button
+            type="button"
+            onClick={openReporterDesk}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-950/30 transition hover:bg-emerald-500 sm:w-auto sm:justify-start"
+          >
+            <FilePlus2 size={18} />
+            {user?.role === "super_admin" ? "Publish News" : "Add News"}
+          </button>
+          {showReporterCardAction ? (
+            <a
+              href={reporterCardUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-2xl shadow-slate-950/20 transition hover:bg-slate-100 sm:w-auto sm:justify-start"
+            >
+              <IdCard size={18} />
+              {user?.role === "chief_editor" ? "Chief Editor ID Card" : "Reporter ID Card"}
+            </a>
+          ) : null}
+        </div>
       ) : null}
       <div>
         <p className="text-sm uppercase tracking-[0.3em] text-orange-300">Dashboard</p>
@@ -1182,38 +1213,6 @@ export const DashboardPage = () => {
               {credentialBusy ? "Saving..." : "Update Credentials"}
             </button>
           </form>
-        </div>
-      ) : null}
-
-      {(user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin") ? (
-        <div className="fixed bottom-6 left-6 z-40 flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={openCredentialForm}
-            className="inline-flex items-center gap-3 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-orange-900/30 transition hover:bg-orange-400"
-          >
-            <KeyRound size={18} />
-            Update Credentials
-          </button>
-          <button
-            type="button"
-            onClick={openReporterDesk}
-            className="inline-flex items-center gap-3 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-950/30 transition hover:bg-emerald-500"
-          >
-            <FilePlus2 size={18} />
-            {user?.role === "super_admin" ? "Publish News" : "Add News"}
-          </button>
-          {(user?.role === "reporter" || user?.role === "chief_editor") && reporterCardUrl ? (
-            <a
-              href={reporterCardUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-2xl shadow-slate-950/20 transition hover:bg-slate-100"
-            >
-              <IdCard size={18} />
-              {user?.role === "chief_editor" ? "Chief Editor ID Card" : "Reporter ID Card"}
-            </a>
-          ) : null}
         </div>
       ) : null}
 

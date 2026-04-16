@@ -36,6 +36,7 @@ const ScrollToTop = () => {
 };
 
 export default function App() {
+  const location = useLocation();
   const [darkMode, setDarkMode] = useState(() => {
     const stored = localStorage.getItem("portal_theme");
     return stored ? stored === "dark" : true;
@@ -77,7 +78,7 @@ export default function App() {
           }
         />
       </Routes>
-      <WhatsAppChannelButton />
+      {location.pathname === "/" ? <WhatsAppChannelButton /> : null}
       <Footer />
     </div>
   );

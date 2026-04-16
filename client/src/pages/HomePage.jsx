@@ -123,6 +123,16 @@ export const HomePage = () => {
     if (!featured?._id) return feed.latest;
     return feed.latest.filter((article) => article._id !== featured._id).slice(0, 9);
   }, [featured?._id, feed.latest]);
+  const voiceHighlights = useMemo(
+    () =>
+      feed.voiceHighlights.filter(
+        (article) =>
+          Boolean(String(article?.audioUrl || "").trim()) &&
+          Number(article?.audioDuration || 0) > 0 &&
+          ["voice", "hybrid"].includes(article?.storyFormat)
+      ),
+    [feed.voiceHighlights]
+  );
   const shouldShowLatestSummary = feed.pagination.totalItems > 0;
   const currentPageArticleCount = feed.latest.length;
   const normalizedPageSize = feed.pagination.pageSize || 10;
@@ -300,7 +310,7 @@ export const HomePage = () => {
         </div>
       </section>
 
-      {feed.voiceHighlights.length ? (
+      {voiceHighlights.length ? (
         <section className="panel overflow-hidden p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -316,7 +326,7 @@ export const HomePage = () => {
           </div>
 
           <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            {feed.voiceHighlights.map((article) => (
+            {voiceHighlights.map((article) => (
               <div key={article._id} className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>

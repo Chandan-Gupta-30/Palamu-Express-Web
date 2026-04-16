@@ -185,6 +185,12 @@ export const getHomepageFeed = asyncHandler(async (req, res) => {
     Article.find(publishedQuery).skip(latestSkip).limit(latestPageSize).sort({ publishedAt: -1 }),
     Article.find(voiceQuery).limit(4).sort({ publishedAt: -1 }),
   ]);
+  const safeVoiceHighlights = voiceHighlights.filter(
+    (article) =>
+      Boolean(String(article.audioUrl || "").trim()) &&
+      Number(article.audioDuration || 0) > 0 &&
+      ["voice", "hybrid"].includes(article.storyFormat)
+  );
 
   const trending = [...latest].sort((firstArticle, secondArticle) => {
     if ((secondArticle.trendingScore || 0) !== (firstArticle.trendingScore || 0)) {
@@ -219,7 +225,7 @@ export const getHomepageFeed = asyncHandler(async (req, res) => {
   res.json({
     breaking,
     latest,
-    voiceHighlights,
+    voiceHighlights: safeVoiceHighlights,
     trending,
     districtWise,
     requestedDate: selectedDate,
