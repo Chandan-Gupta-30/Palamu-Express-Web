@@ -175,7 +175,9 @@ export const getHomepageFeed = asyncHandler(async (req, res) => {
 
   const voiceQuery = {
     ...publishedQuery,
+    storyFormat: { $in: ["voice", "hybrid"] },
     audioUrl: { $exists: true, $ne: "" },
+    audioDuration: { $gt: 0 },
   };
 
   const [breaking, latest, voiceHighlights] = await Promise.all([
@@ -388,11 +390,7 @@ export const getWorkflowArticles = asyncHandler(async (req, res) => {
   const mineOnly = req.query.mine === "true";
   const query = {};
 
-  if (req.user.role === roles.REPORTER) {
-    query.author = req.user._id;
-  }
-
-  if (req.user.role === roles.CHIEF_EDITOR && mineOnly) {
+  if (req.user.role === roles.REPORTER || mineOnly) {
     query.author = req.user._id;
   }
 

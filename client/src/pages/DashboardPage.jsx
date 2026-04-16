@@ -401,7 +401,7 @@ export const DashboardPage = () => {
   };
 
   const refreshMyArticles = () => {
-    const mineQuery = user?.role === "chief_editor" ? "&mine=true" : "";
+    const mineQuery = user?.role === "chief_editor" || user?.role === "super_admin" ? "&mine=true" : "";
     http.get(`/articles/workflow/list?status=all${mineQuery}`).then(({ data }) => setMyArticles(dedupeArticlesById(data.articles))).catch(() => {});
   };
 
@@ -441,9 +441,11 @@ export const DashboardPage = () => {
 
     refreshProfile();
 
-    if (user.role === "reporter" || user.role === "chief_editor") {
+    if (user.role === "reporter" || user.role === "chief_editor" || user.role === "super_admin") {
       refreshMyArticles();
-      http.get("/users/id-card").then(({ data }) => setReporterCardUrl(data.idCardUrl)).catch(() => {});
+      if (user.role === "reporter" || user.role === "chief_editor") {
+        http.get("/users/id-card").then(({ data }) => setReporterCardUrl(data.idCardUrl)).catch(() => {});
+      }
     }
 
     if (user.role === "super_admin") {
@@ -596,17 +598,27 @@ export const DashboardPage = () => {
       if (user?.role === "chief_editor" || user?.role === "super_admin") {
         refreshEditorialQueue();
       }
+      if (user?.role === "chief_editor") {
+        refreshChiefMetrics();
+        refreshPublishedArchive();
+      }
+      if (user?.role === "super_admin") {
+        refreshAdminData();
+        refreshPublishedArchive();
+      }
     }, editingArticleId
       ? user?.role === "chief_editor"
         ? "Published article updated successfully."
         : "Article updated and returned to review queue."
       : user?.role === "chief_editor"
         ? "News published to homepage."
-        : "News submitted for editorial review.");
+        : user?.role === "super_admin"
+          ? "News published to homepage."
+          : "News submitted for editorial review.");
   };
 
   const handleVoiceNewsSubmitted = () => {
-    if (user?.role === "reporter" || user?.role === "chief_editor") {
+    if (user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin") {
       refreshMyArticles();
     }
 
@@ -1173,17 +1185,16 @@ export const DashboardPage = () => {
         </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={openCredentialForm}
-        className="fixed bottom-24 right-4 z-[65] inline-flex items-center gap-3 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-orange-900/30 transition hover:bg-orange-400 sm:bottom-28 sm:right-6"
-      >
-        <KeyRound size={18} />
-        Update Credentials
-      </button>
-
       {(user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin") ? (
         <div className="fixed bottom-6 left-6 z-40 flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={openCredentialForm}
+            className="inline-flex items-center gap-3 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-orange-900/30 transition hover:bg-orange-400"
+          >
+            <KeyRound size={18} />
+            Update Credentials
+          </button>
           <button
             type="button"
             onClick={openReporterDesk}
