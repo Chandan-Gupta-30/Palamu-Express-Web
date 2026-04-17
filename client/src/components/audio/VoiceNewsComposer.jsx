@@ -480,15 +480,15 @@ export const VoiceNewsComposer = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/80 px-4 py-6 pt-24 backdrop-blur sm:px-6 sm:py-8 sm:pt-24">
+    <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/80 px-2 py-3 pt-16 backdrop-blur sm:px-6 sm:py-8 sm:pt-24">
       <div className="mx-auto flex min-h-full w-full max-w-4xl items-start justify-center">
-        <div className="voice-desk-scroll w-full overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/95 shadow-[0_32px_90px_rgba(15,23,42,0.5)]">
+        <div className="voice-desk-scroll w-full overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/95 shadow-[0_32px_90px_rgba(15,23,42,0.5)] sm:rounded-[32px]">
           <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.25),transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.98))] p-6 lg:border-b-0 lg:border-r">
+            <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.25),transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.98))] p-4 sm:p-6 lg:border-b-0 lg:border-r">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">Voice Desk</p>
-                  <h2 className="mt-3 text-3xl font-semibold text-white">Record a voice bulletin</h2>
+                  <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">Record a voice bulletin</h2>
                   <p className="mt-3 text-sm leading-6 text-slate-300">
                     Record the bulletin once, then use browser dictation on each field to refine the written copy in Hindi or English.
                   </p>
@@ -589,7 +589,7 @@ export const VoiceNewsComposer = ({
               </div>
             </div>
 
-            <form onSubmit={submitVoiceNews} className="p-6">
+            <form onSubmit={submitVoiceNews} className="p-4 sm:p-6">
               <div className="mb-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -747,7 +747,8 @@ export const VoiceNewsComposer = ({
                 </div>
               ) : null}
 
-              <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <div className="sticky bottom-0 mt-6 -mx-4 border-t border-white/10 bg-slate-950/95 px-4 pb-1 pt-4 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
+                <div className="flex flex-wrap justify-end gap-3">
                 <button
                   type="button"
                   onClick={onClose}
@@ -762,6 +763,7 @@ export const VoiceNewsComposer = ({
                 >
                   {submitting ? "Publishing..." : userRole === "reporter" ? "Send For Approval" : "Publish Voice News"}
                 </button>
+                </div>
               </div>
             </form>
           </div>

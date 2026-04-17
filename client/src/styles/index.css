@@ -265,6 +265,12 @@ html.light .dashboard-strong-text {
   overflow-y: auto;
 }
 
+@media (max-width: 639px) {
+  .voice-desk-scroll {
+    max-height: calc(100dvh - 1.5rem);
+  }
+}
+
 @media (min-width: 640px) {
   .voice-desk-scroll {
     max-height: calc(100vh - 5rem);
