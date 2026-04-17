@@ -167,7 +167,7 @@ export const AdvertisePage = () => {
       key: razorpayKey,
       amount: order.amount,
       currency: order.currency,
-      name: form.title || "Advertisement Request",
+      name: "Palamu Express",
       description: `${placementLabels[form.placement] || form.placement} for ${selectedPlan?.days || 0} day${selectedPlan?.days > 1 ? "s" : ""}`,
       order_id: order.id,
       image: PALAMU_EXPRESS_CHECKOUT_LOGO,
