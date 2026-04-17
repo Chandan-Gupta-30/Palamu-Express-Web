@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Copy, Facebook, MessageCircleMore, Share2 } from "lucide-react";
+import { Copy, Facebook, Share2 } from "lucide-react";
+import { WhatsAppIcon } from "./WhatsAppIcon";
 
 export const ShareBar = ({ url, title, whatsappUrl, onCopy }) => {
   const [copyMessage, setCopyMessage] = useState("");
@@ -26,7 +27,7 @@ export const ShareBar = ({ url, title, whatsappUrl, onCopy }) => {
     <div className="space-y-3">
       <div className="flex flex-wrap gap-3">
       <a href={shareLinks.whatsapp} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 px-4 py-2 text-sm">
-        <MessageCircleMore className="mr-2 inline" size={16} />
+        <WhatsAppIcon className="mr-2 inline h-4 w-4" />
         WhatsApp
       </a>
       <a href={shareLinks.facebook} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 px-4 py-2 text-sm">

@@ -321,6 +321,8 @@ export const getArticleSharePreview = asyncHandler(async (req, res) => {
     <meta property="og:description" content="${description}" />
     <meta property="og:url" content="${escapeHtml(articleUrl)}" />
     ${imageUrl ? `<meta property="og:image" content="${escapeHtml(imageUrl)}" />` : ""}
+    ${imageUrl ? `<meta property="og:image:secure_url" content="${escapeHtml(imageUrl)}" />` : ""}
+    ${imageUrl ? `<meta property="og:image:alt" content="${title}" />` : ""}
     <meta property="article:published_time" content="${new Date(publishedTime).toISOString()}" />
     <meta property="article:author" content="${authorName}" />
     <meta name="twitter:card" content="${imageUrl ? "summary_large_image" : "summary"}" />

@@ -31,6 +31,6 @@ export const getArticleSharePreviewUrl = (slug) => `${stripTrailingSlash(runtime
 
 export const getWhatsAppShareLink = ({ slug, title }) => {
   const shareUrl = getArticleSharePreviewUrl(slug);
-  const message = [String(title || "").trim(), shareUrl].filter(Boolean).join("\n");
+  const message = [shareUrl, String(title || "").trim()].filter(Boolean).join("\n");
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 };

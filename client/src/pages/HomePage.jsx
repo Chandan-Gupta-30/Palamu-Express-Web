@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Headphones, MessageCircleMore, X } from "lucide-react";
+import { CalendarDays, Headphones, X } from "lucide-react";
 import { http } from "../api/http";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { NewsCard } from "../components/news/NewsCard";
+import { WhatsAppIcon } from "../components/news/WhatsAppIcon";
 import { getArticleAuthorName, getArticlePublishedLabel, getWhatsAppShareLink } from "../utils/articles";
 
 const initialFeed = {
@@ -97,7 +98,7 @@ const WhatsAppShareLink = ({ article, className = "" }) => (
     aria-label={`Share ${article.title} on WhatsApp`}
     className={className}
   >
-    <MessageCircleMore className="h-4 w-4" />
+    <WhatsAppIcon className="h-4 w-4" />
   </a>
 );
 

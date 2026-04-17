@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, FilePlus2, IdCard, KeyRound, Megaphone, Mic, X } from "lucide-react";
+import { Eye, EyeOff, FilePlus2, FolderKanban, IdCard, KeyRound, Megaphone, Mic, X } from "lucide-react";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { VoiceNewsComposer } from "../components/audio/VoiceNewsComposer";
 import { MetricCard } from "../components/dashboard/MetricCard";
@@ -106,6 +106,19 @@ const formatDate = (value) => {
     year: "numeric",
   });
 };
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const getAdvertisementActivityDate = (ad) => ad.paidAt || ad.reviewedAt || ad.startsAt || ad.createdAt || "";
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
@@ -329,6 +342,9 @@ export const DashboardPage = () => {
   const [showReporterDesk, setShowReporterDesk] = useState(false);
   const [showVoiceDesk, setShowVoiceDesk] = useState(false);
   const [showAdRequestsPanel, setShowAdRequestsPanel] = useState(false);
+  const [adSearch, setAdSearch] = useState("");
+  const [adStatusFilter, setAdStatusFilter] = useState("all");
+  const [adDateFilter, setAdDateFilter] = useState("");
 
   const articleBlocks = useMemo(
     () => (articleForm.district ? jharkhandBlocksByDistrict[articleForm.district] || [] : []),
@@ -340,12 +356,29 @@ export const DashboardPage = () => {
     [adForm.placement]
   );
   const reviewableAds = useMemo(
-    () => ads.filter((ad) => ad.paymentStatus === "paid"),
+    () => ads.filter((ad) => ad.paymentStatus === "paid" && ad.status === "pending_approval"),
     [ads]
   );
   const pendingAdRequestsCount = useMemo(
-    () => reviewableAds.filter((ad) => ad.status === "pending_approval").length,
+    () => reviewableAds.length,
     [reviewableAds]
+  );
+  const visibleManagedAds = useMemo(
+    () =>
+      ads.filter((ad) => {
+        const matchesStatus = adStatusFilter === "all" || ad.status === adStatusFilter;
+        const activityDateValue = getAdvertisementActivityDate(ad);
+        const activityDate = activityDateValue ? new Date(activityDateValue).toISOString().slice(0, 10) : "";
+        const matchesDate = !adDateFilter || activityDate === adDateFilter;
+        const matchesSearch = [ad.title, ad.advertiserName, ad.companyName, ad.advertiserEmail, ad.placement, ad.status]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(adSearch.toLowerCase());
+
+        return matchesStatus && matchesDate && matchesSearch;
+      }),
+    [ads, adDateFilter, adSearch, adStatusFilter]
   );
 
   const canAccessNewsDesk = user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified);
@@ -722,6 +755,16 @@ export const DashboardPage = () => {
         block: "center",
       });
     }, 180);
+  };
+
+  const focusManageAdsSection = () => {
+    setShowAdRequestsPanel(false);
+    setTimeout(() => {
+      document.getElementById("advertisement-management-form")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
   };
 
   const deleteAd = async (adId) => {
@@ -1121,6 +1164,29 @@ export const DashboardPage = () => {
               <Mic className="h-5 w-5 text-emerald-300" />
               <span>Record News</span>
             </button>
+            {user?.role === "super_admin" ? (
+              <button
+                type="button"
+                onClick={() => setShowAdRequestsPanel(true)}
+                className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full border border-orange-300/35 bg-slate-950/95 px-4 py-3 text-[13px] font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-orange-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
+              >
+                <Megaphone className="h-5 w-5 text-orange-300" />
+                <span>Ad Requests</span>
+                {pendingAdRequestsCount ? (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-bold text-white">{pendingAdRequestsCount}</span>
+                ) : null}
+              </button>
+            ) : null}
+            {user?.role === "super_admin" ? (
+              <button
+                type="button"
+                onClick={focusManageAdsSection}
+                className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full border border-emerald-300/35 bg-slate-950/95 px-4 py-3 text-[13px] font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-emerald-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
+              >
+                <FolderKanban className="h-5 w-5 text-emerald-300" />
+                <span>Manage Ads</span>
+              </button>
+            ) : null}
           </div>
         </>
       ) : null}
@@ -1873,6 +1939,98 @@ export const DashboardPage = () => {
                 </div>
                 <button className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white">{busyAction ? "Saving..." : editingAdId ? "Update Advertisement" : "Publish Advertisement"}</button>
               </form>
+
+              <div className="mt-8 border-t border-white/10 pt-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold text-white">Manage All Ads</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      Filter advertisements by date, status, or advertiser and then edit or delete any single campaign.
+                    </p>
+                  </div>
+                  <div className="text-sm text-slate-400">
+                    <span className="font-semibold text-white">{visibleManagedAds.length}</span> ad{visibleManagedAds.length === 1 ? "" : "s"} match the current filters.
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <input
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                    placeholder="Search by title, advertiser, company, email"
+                    value={adSearch}
+                    onChange={(event) => setAdSearch(event.target.value)}
+                  />
+                  <select
+                    className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
+                    value={adStatusFilter}
+                    onChange={(event) => setAdStatusFilter(event.target.value)}
+                  >
+                    <option value="all">All statuses</option>
+                    {adStatuses.map((status) => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="date"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                    value={adDateFilter}
+                    onChange={(event) => setAdDateFilter(event.target.value)}
+                  />
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  {visibleManagedAds.map((ad) => (
+                    <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      {ad.imageUrl ? (
+                        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                          <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-contain" />
+                        </div>
+                      ) : null}
+                      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-lg font-semibold text-white">{ad.title}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {adPlacements.find((placement) => placement.value === ad.placement)?.label || ad.placement}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{ad.status}</span>
+                          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">{ad.paymentStatus || "pending"}</span>
+                        </div>
+                      </div>
+                      {ad.description ? <p className="mt-3 text-sm leading-6 text-slate-400">{ad.description}</p> : null}
+                      <div className="mt-4 grid gap-2 text-sm text-slate-500 md:grid-cols-2">
+                        <p>Advertiser: {ad.advertiserName || "-"}</p>
+                        <p>Company: {ad.companyName || "-"}</p>
+                        <p>Email: {ad.advertiserEmail || "-"}</p>
+                        <p>Phone: {ad.advertiserPhone || "-"}</p>
+                        <p>Priority: {ad.priority}</p>
+                        <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
+                        <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
+                        <p>Activity Date: {formatDate(getAdvertisementActivityDate(ad))}</p>
+                        <p>Paid At: {formatDateTime(ad.paidAt)}</p>
+                        <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => deleteAd(ad._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+                          Delete
+                        </button>
+                        {ad.status === "pending_approval" ? (
+                          <button type="button" onClick={() => approveAd(ad._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">
+                            Approve
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                  {!visibleManagedAds.length ? <p className="text-slate-500">No advertisements match the current filters.</p> : null}
+                </div>
+              </div>
             </div>
 
           </div>
@@ -1881,20 +2039,6 @@ export const DashboardPage = () => {
 
       {user?.role === "super_admin" ? (
         <>
-          <button
-            type="button"
-            onClick={() => setShowAdRequestsPanel(true)}
-            className={`fixed right-6 z-[70] inline-flex items-center gap-3 rounded-full border border-orange-300/35 bg-slate-950/95 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-orange-300/60 hover:bg-slate-900 ${
-              showDashboardActions ? "bottom-40 sm:bottom-32" : "bottom-6"
-            }`}
-          >
-            <Megaphone className="h-5 w-5 text-orange-300" />
-            <span>Ad Requests</span>
-            {pendingAdRequestsCount ? (
-              <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-bold text-white">{pendingAdRequestsCount}</span>
-            ) : null}
-          </button>
-
           {showAdRequestsPanel ? (
             <div className="fixed inset-0 z-[85] flex justify-end bg-slate-950/70 px-4 py-4 backdrop-blur-sm">
               <div className="voice-desk-scroll w-full max-w-2xl rounded-[32px] border border-white/10 bg-slate-950/95 p-6 shadow-[0_32px_80px_rgba(15,23,42,0.45)]">
@@ -1903,7 +2047,7 @@ export const DashboardPage = () => {
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">Super Admin Queue</p>
                     <h2 className="mt-3 text-2xl font-semibold text-white">Advertisement Requests</h2>
                     <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Paid advertisement requests stay hidden from the dashboard until you open this review panel.
+                      Only pending paid advertisement requests appear here for final super admin review.
                     </p>
                   </div>
                   <button
@@ -1920,8 +2064,8 @@ export const DashboardPage = () => {
                   {reviewableAds.map((ad) => (
                     <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
                       {ad.imageUrl ? (
-                        <div className="overflow-hidden rounded-2xl">
-                          <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-cover object-center" />
+                        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                          <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-contain" />
                         </div>
                       ) : null}
                       <div className="mt-4 flex items-start justify-between gap-3">
@@ -1972,7 +2116,7 @@ export const DashboardPage = () => {
                       </div>
                     </div>
                   ))}
-                  {!reviewableAds.length ? <p className="text-slate-500">No successful paid advertisement requests are available yet.</p> : null}
+                  {!reviewableAds.length ? <p className="text-slate-500">No pending paid advertisement requests are available right now.</p> : null}
                 </div>
               </div>
             </div>

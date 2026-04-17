@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { MessageCircleMore } from "lucide-react";
 import { AudioStoryPlayer } from "../audio/AudioStoryPlayer";
+import { WhatsAppIcon } from "./WhatsAppIcon";
 import { getArticleAuthorName, getArticlePublishedLabel, getWhatsAppShareLink } from "../../utils/articles";
 
 export const NewsCard = ({ article }) => (
@@ -29,7 +29,7 @@ export const NewsCard = ({ article }) => (
           aria-label={`Share ${article.title} on WhatsApp`}
           className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20 hover:text-emerald-200"
         >
-          <MessageCircleMore className="h-4 w-4" />
+          <WhatsAppIcon className="h-4 w-4" />
         </a>
       </div>
       <h3 className="text-xl font-semibold text-white">{article.title}</h3>
