@@ -172,19 +172,19 @@ export const deleteArticle = asyncHandler(async (req, res) => {
     return res.status(StatusCodes.FORBIDDEN).json({ message: "Your newsroom actions are currently disabled by the super admin." });
   }
 
-  const canDeleteAnyArticle = canReviewArticles(req.user);
-  const deleteQuery = canDeleteAnyArticle
+  const canDeletePublishedArticles = canReviewArticles(req.user);
+  const query = canDeletePublishedArticles
     ? { _id: req.params.id }
     : {
         _id: req.params.id,
         author: req.user._id,
         status: { $ne: articleStatuses.PUBLISHED },
       };
-  const article = await Article.findOneAndDelete(deleteQuery);
+  const article = await Article.findOneAndDelete(query);
 
   if (!article) {
     return res.status(StatusCodes.NOT_FOUND).json({
-      message: canDeleteAnyArticle ? "Article not found" : "Only your non-published articles can be deleted",
+      message: canDeletePublishedArticles ? "Article not found" : "Only your non-published articles can be deleted",
     });
   }
 

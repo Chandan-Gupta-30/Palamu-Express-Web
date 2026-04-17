@@ -504,14 +504,16 @@ export const DashboardPage = () => {
   };
 
   const refreshAdminData = () => {
-    http.get("/admin/overview").then(({ data }) => setMetrics(data.metrics)).catch(() => {});
-    http.get("/admin/pending-approvals").then(({ data }) => {
-      setPendingUsers(data.pendingUsers);
-      setPendingArticles(data.pendingArticles);
-    }).catch(() => {});
-    http.get("/users?roles=reporter,chief_editor").then(({ data }) => setManagedUsers(data.users)).catch(() => {});
-    http.get("/ads").then(({ data }) => setAds(data.ads)).catch(() => {});
-    http.get("/contact").then(({ data }) => setContactMessages(data.messages)).catch(() => {});
+    return Promise.all([
+      http.get("/admin/overview").then(({ data }) => setMetrics(data.metrics)).catch(() => {}),
+      http.get("/admin/pending-approvals").then(({ data }) => {
+        setPendingUsers(data.pendingUsers);
+        setPendingArticles(data.pendingArticles);
+      }).catch(() => {}),
+      http.get("/users?roles=reporter,chief_editor").then(({ data }) => setManagedUsers(data.users)).catch(() => {}),
+      http.get("/ads").then(({ data }) => setAds(data.ads)).catch(() => {}),
+      http.get("/contact").then(({ data }) => setContactMessages(data.messages)).catch(() => {}),
+    ]);
   };
 
   useEffect(() => {
@@ -716,6 +718,7 @@ export const DashboardPage = () => {
   };
 
   const startEditArticle = (article) => {
+    setShowReporterDesk(true);
     setEditingArticleId(article._id);
     setArticleForm({
       title: article.title,
@@ -730,7 +733,13 @@ export const DashboardPage = () => {
       audioWaveform: article.audioWaveform || [],
       audioTranscript: article.audioTranscript || "",
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => {
+      document.getElementById("reporter-desk-panel")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      document.getElementById("article-headline-input")?.focus();
+    }, 120);
   };
 
   const deleteArticle = async (articleId) => {
@@ -769,7 +778,7 @@ export const DashboardPage = () => {
       refreshMyArticles();
       refreshPublishedArchive();
       if (user?.role === "super_admin") {
-        refreshAdminData();
+        await refreshAdminData();
       }
       if (user?.role === "chief_editor") {
         refreshEditorialQueue();
@@ -820,9 +829,10 @@ export const DashboardPage = () => {
     setTimeout(() => {
       document.getElementById("advertisement-management-form")?.scrollIntoView({
         behavior: "smooth",
-        block: "center",
+        block: "start",
       });
-    }, 180);
+      document.getElementById("advertisement-title-input")?.focus();
+    }, 120);
   };
 
   const focusManageAdsSection = () => {
@@ -887,9 +897,16 @@ export const DashboardPage = () => {
 
   const saveManagedUser = async (userId) => {
     await handleAction(async () => {
-      await http.patch(`/users/${userId}`, managedUserForm);
+      const { data } = await http.patch(`/users/${userId}`, managedUserForm);
+      setManagedUsers((current) =>
+        current.map((managedUser) => (managedUser._id === userId ? data.user : managedUser))
+      );
+      if (profile?._id === userId) {
+        setProfile(data.user);
+        await refreshUser();
+      }
       resetManagedUserForm();
-      refreshAdminData();
+      await refreshAdminData();
     }, "User updated.");
   };
 
@@ -1206,7 +1223,7 @@ export const DashboardPage = () => {
       <ConfirmActionModal
         open={Boolean(pendingArchiveArticleDelete)}
         title="Delete published article"
-        description={`This will permanently delete "${pendingArchiveArticleDelete?.title || "this article"}" from the archive. This action cannot be undone.`}
+        description={`This will permanently delete "${pendingArchiveArticleDelete?.title || "this article"}". This action cannot be undone.`}
         confirmLabel="Delete Article"
         cancelLabel="Keep Article"
         kicker="Delete Article"
@@ -1507,7 +1524,7 @@ export const DashboardPage = () => {
                 </p>
               ) : (
                 <form onSubmit={submitArticle} className="mt-5 grid gap-4 md:grid-cols-2">
-                  <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white md:col-span-2" placeholder="Headline" value={articleForm.title} onChange={(event) => setArticleForm({ ...articleForm, title: event.target.value })} />
+                  <input id="article-headline-input" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white md:col-span-2" placeholder="Headline" value={articleForm.title} onChange={(event) => setArticleForm({ ...articleForm, title: event.target.value })} />
                   <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={articleForm.district} onChange={(event) => setArticleForm({ ...articleForm, district: event.target.value, area: "" })}>
                     <option value="">Select district</option>
                     {jharkhandDistricts.map((district) => (
@@ -2012,7 +2029,7 @@ export const DashboardPage = () => {
                   <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Company or brand name" value={adForm.companyName} onChange={(event) => setAdForm({ ...adForm, companyName: event.target.value })} />
                 </div>
                 <div>
-                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Campaign title, for example Palamu Trade Fair 2026" value={adForm.title} onChange={(event) => setAdForm({ ...adForm, title: event.target.value })} />
+                  <input id="advertisement-title-input" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Campaign title, for example Palamu Trade Fair 2026" value={adForm.title} onChange={(event) => setAdForm({ ...adForm, title: event.target.value })} />
                   <p className="mt-2 text-xs text-slate-500">Use a short sponsor title that is easy to recognize on the homepage.</p>
                 </div>
                 <div>
