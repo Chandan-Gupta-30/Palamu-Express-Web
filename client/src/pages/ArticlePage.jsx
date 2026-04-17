@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
-import { Bookmark } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Bookmark } from "lucide-react";
 import { http } from "../api/http";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { ShareBar } from "../components/news/ShareBar";
@@ -21,6 +21,7 @@ const GeminiIcon = ({ className = "" }) => (
 export const ArticlePage = () => {
   const { slug } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [article, setArticle] = useState(null);
   const [summary, setSummary] = useState("");
@@ -122,6 +123,7 @@ export const ArticlePage = () => {
   const whatsappPreviewUrl = getArticleSharePreviewUrl(slug);
   const isBookmarked = Boolean(user?.bookmarks?.some((item) => (item._id || item).toString() === article._id));
   const summaryLocked = Boolean(summary);
+  const dashboardReturn = location.state?.dashboardReturn;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-10">
@@ -133,6 +135,23 @@ export const ArticlePage = () => {
         persistent={actionPopup?.persistent}
         onClose={actionPopup?.persistent ? undefined : () => setActionPopup(null)}
       />
+      {dashboardReturn ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+              return;
+            }
+
+            navigate(dashboardReturn.path || "/dashboard");
+          }}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/5"
+        >
+          <ArrowLeft size={16} />
+          {dashboardReturn.label || "Back to Dashboard"}
+        </button>
+      ) : null}
       <div className="space-y-3">
         <p className="text-sm uppercase tracking-[0.3em] text-orange-300">
           {article.district} • {article.area}

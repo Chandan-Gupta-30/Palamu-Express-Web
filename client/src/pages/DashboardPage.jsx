@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, FilePlus2, FolderKanban, IdCard, KeyRound, Megaphone, Mic, X } from "lucide-react";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { VoiceNewsComposer } from "../components/audio/VoiceNewsComposer";
@@ -230,6 +231,7 @@ const PublishedArchiveSection = ({
   onEditArticle,
   onDeleteArticle,
   onCopyLink,
+  onOpenArticle,
 }) => (
   <div className="panel p-6">
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -276,7 +278,19 @@ const PublishedArchiveSection = ({
 
     <div className="mt-5 space-y-4">
       {articles.map((article) => (
-        <div key={article._id} className="rounded-2xl border border-white/10 p-4">
+        <div
+          key={article._id}
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpenArticle(article)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onOpenArticle(article);
+            }
+          }}
+          className="cursor-pointer rounded-2xl border border-white/10 p-4 transition hover:border-white/20 hover:bg-white/[0.03]"
+        >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -294,9 +308,6 @@ const PublishedArchiveSection = ({
               <p className="text-sm text-slate-500">Published: {getArticlePublishedLabel(article)}</p>
               <p className="text-sm text-slate-500">Views: {getArticleViews(article)}</p>
             </div>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">
-              {article.status}
-            </span>
           </div>
           {article.coverImageUrl ? (
             <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
@@ -305,13 +316,22 @@ const PublishedArchiveSection = ({
           ) : null}
           {article.excerpt ? <p className="mt-4 text-sm leading-6 text-slate-400">{article.excerpt}</p> : null}
           <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" onClick={() => onEditArticle(article)} className="dashboard-outline-button rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
+            <button type="button" onClick={(event) => {
+              event.stopPropagation();
+              onEditArticle(article);
+            }} className="dashboard-outline-button rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
               Edit
             </button>
-            <button type="button" onClick={() => onDeleteArticle(article)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+            <button type="button" onClick={(event) => {
+              event.stopPropagation();
+              onDeleteArticle(article);
+            }} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
               Delete
             </button>
-            <button type="button" onClick={() => onCopyLink(article)} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
+            <button type="button" onClick={(event) => {
+              event.stopPropagation();
+              onCopyLink(article);
+            }} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
               Copy Link
             </button>
           </div>
@@ -326,6 +346,7 @@ const PublishedArchiveSection = ({
 
 export const DashboardPage = () => {
   const { user, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState(null);
   const [profile, setProfile] = useState(null);
   const [reporterCardUrl, setReporterCardUrl] = useState("");
@@ -476,6 +497,19 @@ export const DashboardPage = () => {
     } finally {
       setBusyAction("");
     }
+  };
+
+  const openArticleFromDashboard = (article) => {
+    if (!article?.slug) return;
+
+    navigate(`/article/${article.slug}`, {
+      state: {
+        dashboardReturn: {
+          path: "/dashboard",
+          label: "Back to Dashboard",
+        },
+      },
+    });
   };
 
   const refreshProfile = () => {
@@ -1647,7 +1681,19 @@ export const DashboardPage = () => {
             </div>
             <div className="mt-5 space-y-4">
               {pagedArticles.map((article) => (
-                <div key={article._id} className="rounded-2xl border border-white/10 p-4">
+                <div
+                  key={article._id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openArticleFromDashboard(article)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openArticleFromDashboard(article);
+                    }
+                  }}
+                  className="cursor-pointer rounded-2xl border border-white/10 p-4 transition hover:border-white/20 hover:bg-white/[0.03]"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-lg font-semibold text-white">{article.title}</p>
@@ -1671,18 +1717,27 @@ export const DashboardPage = () => {
                   ) : null}
                   {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
                   <div className="mt-4 flex flex-wrap gap-3">
-                    <button type="button" onClick={() => copyArticleLink(article)} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
+                    <button type="button" onClick={(event) => {
+                      event.stopPropagation();
+                      copyArticleLink(article);
+                    }} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
                       Copy Link
                     </button>
                   </div>
                   {article.status !== "published" ? (
                     <div className="mt-4 flex gap-3">
                       {!article.audioUrl ? (
-                        <button type="button" onClick={() => startEditArticle(article)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
+                        <button type="button" onClick={(event) => {
+                          event.stopPropagation();
+                          startEditArticle(article);
+                        }} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
                           Edit
                         </button>
                       ) : null}
-                      <button type="button" onClick={() => deleteArticle(article._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+                      <button type="button" onClick={(event) => {
+                        event.stopPropagation();
+                        deleteArticle(article._id);
+                      }} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
                         Delete
                       </button>
                     </div>
@@ -1720,6 +1775,7 @@ export const DashboardPage = () => {
                 onEditArticle={startEditArticle}
                 onDeleteArticle={(article) => setPendingArchiveArticleDelete(article)}
                 onCopyLink={copyArticleLink}
+                onOpenArticle={openArticleFromDashboard}
               />
 
             <div className="panel p-6">
@@ -1772,6 +1828,7 @@ export const DashboardPage = () => {
             onEditArticle={startEditArticle}
             onDeleteArticle={(article) => setPendingArchiveArticleDelete(article)}
             onCopyLink={copyArticleLink}
+            onOpenArticle={openArticleFromDashboard}
           />
 
           <div className="panel p-6">
