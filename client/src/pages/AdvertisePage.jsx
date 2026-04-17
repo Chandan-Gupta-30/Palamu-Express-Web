@@ -323,8 +323,8 @@ export const AdvertisePage = () => {
       />
 
       {checkoutDraft ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-[32px] border border-orange-300/20 bg-slate-950/95 p-6 shadow-[0_32px_80px_rgba(15,23,42,0.45)]">
+        <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/75 px-4 py-6 backdrop-blur-sm sm:items-center sm:py-4">
+          <div className="max-h-[calc(100vh-3rem)] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-orange-300/20 bg-slate-950/95 p-6 shadow-[0_32px_80px_rgba(15,23,42,0.45)] sm:max-h-[calc(100vh-2rem)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">Checkout Preview</p>

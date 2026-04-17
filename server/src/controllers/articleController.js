@@ -5,6 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { approvalStatuses, articleStatuses, roles } from "../utils/constants.js";
 import { generateVoiceDraft, summarizeArticle } from "../services/geminiService.js";
 import { uploadBase64Asset } from "../services/uploadService.js";
+import { env } from "../config/env.js";
 
 const slugify = (value) =>
   value
@@ -36,6 +37,21 @@ const normalizeWaveform = (waveform) => {
     .filter((value) => Number.isFinite(value))
     .map((value) => Math.max(0, Math.min(1, value)))
     .slice(0, 64);
+};
+
+const escapeHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const stripHtml = (value) => String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const getArticlePreviewDescription = (article) => {
+  const fallbackText = article?.excerpt || article?.content || article?.audioTranscript || "";
+  return stripHtml(fallbackText).slice(0, 240) || "Read the latest report on Palamu Express.";
 };
 
 const buildArticlePayload = async (body) => {
@@ -181,9 +197,9 @@ export const getHomepageFeed = asyncHandler(async (req, res) => {
   };
 
   const [breaking, latest, voiceHighlights] = await Promise.all([
-    Article.find({ ...publishedQuery, breaking: true }).limit(5).sort({ publishedAt: -1 }),
-    Article.find(publishedQuery).skip(latestSkip).limit(latestPageSize).sort({ publishedAt: -1 }),
-    Article.find(voiceQuery).limit(4).sort({ publishedAt: -1 }),
+    Article.find({ ...publishedQuery, breaking: true }).populate("author", "fullName district area").limit(5).sort({ publishedAt: -1 }),
+    Article.find(publishedQuery).populate("author", "fullName district area").skip(latestSkip).limit(latestPageSize).sort({ publishedAt: -1 }),
+    Article.find(voiceQuery).populate("author", "fullName district area").limit(4).sort({ publishedAt: -1 }),
   ]);
   const safeVoiceHighlights = voiceHighlights.filter(
     (article) =>
@@ -270,6 +286,57 @@ export const getArticleBySlug = asyncHandler(async (req, res) => {
   }
 
   res.json({ article });
+});
+
+export const getArticleSharePreview = asyncHandler(async (req, res) => {
+  const article = await Article.findOne({ slug: req.params.slug, status: articleStatuses.PUBLISHED }).populate(
+    "author",
+    "fullName district area"
+  );
+
+  if (!article) {
+    return res.status(StatusCodes.NOT_FOUND).send("Article not found");
+  }
+
+  const normalizedClientOrigin = String(env.clientUrl || "").trim().replace(/\/+$/, "");
+  const articleUrl = `${normalizedClientOrigin}/article/${article.slug}`;
+  const title = escapeHtml(article.title || "Palamu Express");
+  const description = escapeHtml(getArticlePreviewDescription(article));
+  const imageUrl = String(article.coverImageUrl || "").trim();
+  const authorName = escapeHtml(article.author?.fullName || "Palamu Express Desk");
+  const publishedTime = article.publishedAt || article.createdAt;
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <meta name="description" content="${description}" />
+    <meta name="author" content="${authorName}" />
+    <meta name="robots" content="noindex,follow" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Palamu Express" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${escapeHtml(articleUrl)}" />
+    ${imageUrl ? `<meta property="og:image" content="${escapeHtml(imageUrl)}" />` : ""}
+    <meta property="article:published_time" content="${new Date(publishedTime).toISOString()}" />
+    <meta property="article:author" content="${authorName}" />
+    <meta name="twitter:card" content="${imageUrl ? "summary_large_image" : "summary"}" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${description}" />
+    ${imageUrl ? `<meta name="twitter:image" content="${escapeHtml(imageUrl)}" />` : ""}
+    <meta http-equiv="refresh" content="0; url=${escapeHtml(articleUrl)}" />
+    <link rel="canonical" href="${escapeHtml(articleUrl)}" />
+    <script>
+      window.location.replace(${JSON.stringify(articleUrl)});
+    </script>
+  </head>
+  <body>
+    <p>Redirecting to <a href="${escapeHtml(articleUrl)}">${title}</a>...</p>
+  </body>
+</html>`);
 });
 
 export const incrementArticleView = asyncHandler(async (req, res) => {

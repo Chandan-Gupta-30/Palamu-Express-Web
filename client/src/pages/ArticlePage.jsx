@@ -7,6 +7,7 @@ import { ShareBar } from "../components/news/ShareBar";
 import { ActionPopup } from "../components/ui/ActionPopup";
 import { useSocket } from "../hooks/useSocket";
 import { useAuth } from "../context/AuthContext";
+import { getArticleAuthorName, getArticlePageUrl, getArticlePublishedLabel, getArticleSharePreviewUrl } from "../utils/articles";
 
 const GeminiIcon = ({ className = "" }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
@@ -117,7 +118,8 @@ export const ArticlePage = () => {
     return <div className="mx-auto max-w-4xl px-4 py-12 text-slate-500">Loading article...</div>;
   }
 
-  const articleUrl = `${window.location.origin}/article/${slug}`;
+  const articleUrl = getArticlePageUrl(slug);
+  const whatsappPreviewUrl = getArticleSharePreviewUrl(slug);
   const isBookmarked = Boolean(user?.bookmarks?.some((item) => (item._id || item).toString() === article._id));
   const summaryLocked = Boolean(summary);
 
@@ -137,6 +139,8 @@ export const ArticlePage = () => {
         </p>
         <h1 className="font-display text-4xl text-white md:text-5xl">{article.title}</h1>
         <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+          <span>By {getArticleAuthorName(article)}</span>
+          <span>Published: {getArticlePublishedLabel(article)}</span>
           <span>Views: {pageViews || article.pageViews}</span>
           <span>Status: {article.status}</span>
         </div>
@@ -248,6 +252,7 @@ export const ArticlePage = () => {
       <ShareBar
         url={articleUrl}
         title={article.title}
+        whatsappUrl={whatsappPreviewUrl}
         onCopy={({ type, message }) =>
           setActionPopup({
             type,

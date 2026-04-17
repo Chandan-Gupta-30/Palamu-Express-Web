@@ -14,6 +14,7 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import { env } from "./config/env.js";
 import { errorHandler, notFound } from "./middlewares/errorHandler.js";
+import { getArticleSharePreview } from "./controllers/articleController.js";
 
 export const createApp = (io) => {
   const app = express();
@@ -38,6 +39,7 @@ export const createApp = (io) => {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", service: "palamu-express-api" });
   });
+  app.get("/share/article/:slug", getArticleSharePreview);
 
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Copy, Facebook, MessageCircleMore, Share2 } from "lucide-react";
 
-export const ShareBar = ({ url, title, onCopy }) => {
+export const ShareBar = ({ url, title, whatsappUrl, onCopy }) => {
   const [copyMessage, setCopyMessage] = useState("");
   const shareLinks = {
-    whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title} ${url}`)}`,
+    whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title} ${whatsappUrl || url}`)}`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
     x: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`,
   };

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Headphones, X } from "lucide-react";
+import { CalendarDays, Headphones, MessageCircleMore, X } from "lucide-react";
 import { http } from "../api/http";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { NewsCard } from "../components/news/NewsCard";
+import { getArticleAuthorName, getArticlePublishedLabel, getWhatsAppShareLink } from "../utils/articles";
 
 const initialFeed = {
   breaking: [],
@@ -79,6 +80,25 @@ const StoryListLink = ({ article, children, className = "" }) => (
   <Link to={`/article/${article.slug}`} className={className}>
     {children}
   </Link>
+);
+
+const ArticleMeta = ({ article, compact = false }) => (
+  <div className={`flex flex-wrap items-center gap-3 text-slate-500 ${compact ? "text-xs" : "text-sm"}`}>
+    <span>By {getArticleAuthorName(article)}</span>
+    <span>{getArticlePublishedLabel(article)}</span>
+  </div>
+);
+
+const WhatsAppShareLink = ({ article, className = "" }) => (
+  <a
+    href={getWhatsAppShareLink({ slug: article.slug, title: article.title })}
+    target="_blank"
+    rel="noreferrer"
+    aria-label={`Share ${article.title} on WhatsApp`}
+    className={className}
+  >
+    <MessageCircleMore className="h-4 w-4" />
+  </a>
 );
 
 export const HomePage = () => {
@@ -276,9 +296,14 @@ export const HomePage = () => {
                 ) : null}
                 <h1 className="max-w-3xl font-display text-4xl leading-tight text-white md:text-6xl">{featured.title}</h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">{featured.excerpt}</p>
-                <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
+                <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-500">
                   <span>{featured.district}</span>
                   <span>{featured.area}</span>
+                  <ArticleMeta article={featured} />
+                  <WhatsAppShareLink
+                    article={featured}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20 hover:text-emerald-200"
+                  />
                 </div>
                 {featured.audioUrl ? <AudioStoryPlayer article={featured} compact className="mt-6 max-w-xl" /> : null}
                 <Link to={`/article/${featured.slug}`} className="mt-6 inline-flex rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white">
@@ -320,6 +345,13 @@ export const HomePage = () => {
                 >
                   <p className="text-xs uppercase tracking-[0.2em] text-orange-300">{article.district}{article.audioUrl ? " • Voice" : ""}</p>
                   <p className="mt-2 text-white hover:text-orange-200">{article.title}</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <ArticleMeta article={article} compact />
+                    <WhatsAppShareLink
+                      article={article}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
+                    />
+                  </div>
                 </StoryListLink>
               ))}
             </div>
@@ -362,10 +394,19 @@ export const HomePage = () => {
                       {article.district} • {article.area}
                     </p>
                     <h3 className="mt-2 text-xl font-semibold text-white">{article.title}</h3>
+                    <div className="mt-3">
+                      <ArticleMeta article={article} compact />
+                    </div>
                   </div>
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">
-                    {article.storyFormat || "voice"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">
+                      {article.storyFormat || "voice"}
+                    </span>
+                    <WhatsAppShareLink
+                      article={article}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20"
+                    />
+                  </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-300">{article.excerpt}</p>
                 <AudioStoryPlayer article={article} compact className="mt-4" />
@@ -470,9 +511,16 @@ export const HomePage = () => {
                 className="flex gap-4 rounded-2xl border-b border-white/10 pb-4 transition hover:bg-white/[0.03] last:border-b-0"
               >
                 <span className="text-3xl font-display text-orange-300">{String(index + 1).padStart(2, "0")}</span>
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-slate-500">{article.district}</p>
                   <p className="text-white hover:text-orange-200">{article.title}</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <ArticleMeta article={article} compact />
+                    <WhatsAppShareLink
+                      article={article}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
+                    />
+                  </div>
                 </div>
               </StoryListLink>
             ))}
@@ -507,6 +555,13 @@ export const HomePage = () => {
                       <StoryListLink key={article._id} article={article} className="rounded-2xl border border-white/10 p-4 transition hover:border-orange-400/40 hover:bg-white/[0.03]">
                         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{article.area}{article.audioUrl ? " • Voice" : ""}</p>
                         <p className="mt-2 text-white hover:text-orange-200">{article.title}</p>
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <ArticleMeta article={article} compact />
+                          <WhatsAppShareLink
+                            article={article}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
+                          />
+                        </div>
                       </StoryListLink>
                     ))}
                   </div>
