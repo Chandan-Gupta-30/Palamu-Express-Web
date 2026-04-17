@@ -20,7 +20,7 @@ const initialForm = {
   imageUrl: "",
   targetUrl: "",
   placement: "homepage-latest",
-  durationDays: 7,
+  durationDays: 1,
   ctaLabel: "Visit Sponsor",
   notes: "",
 };
@@ -48,28 +48,31 @@ const formatCurrency = (value) =>
   }).format(Number(value || 0));
 
 const isTestRazorpayKey = (value) => String(value || "").startsWith("rzp_test_");
+const getBannerPreviewUrl = (value) => String(value || "").trim();
 
 export const AdvertisePage = () => {
   const [form, setForm] = useState(initialForm);
-  const [durationPlans, setDurationPlans] = useState([]);
+  const [placementPricing, setPlacementPricing] = useState({});
   const [razorpayKeyId, setRazorpayKeyId] = useState("");
   const [popup, setPopup] = useState(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [checkoutDraft, setCheckoutDraft] = useState(null);
 
   useEffect(() => {
     http
       .get("/ads/form-options")
       .then(({ data }) => {
-        const plans = Array.isArray(data.durationPlans) ? data.durationPlans : [];
-        setDurationPlans(plans);
+        const pricing = data.placementPricing || {};
+        setPlacementPricing(pricing);
         setRazorpayKeyId(data.razorpayKeyId || "");
-        if (plans.length) {
-          setForm((current) => ({
-            ...current,
-            durationDays: current.durationDays || plans[0].days,
-          }));
-        }
+        const defaultPlacement = pricing[initialForm.placement] ? initialForm.placement : Object.keys(pricing)[0] || initialForm.placement;
+        const defaultDuration = pricing[defaultPlacement]?.durationPlans?.[0]?.days || initialForm.durationDays;
+        setForm((current) => ({
+          ...current,
+          placement: defaultPlacement,
+          durationDays: defaultDuration,
+        }));
       })
       .catch(() => {
         setPopup({
@@ -81,11 +84,101 @@ export const AdvertisePage = () => {
       .finally(() => setLoadingOptions(false));
   }, []);
 
+  const activePlacementPricing = useMemo(
+    () => placementPricing[form.placement] || null,
+    [placementPricing, form.placement]
+  );
+  const durationPlans = useMemo(
+    () => activePlacementPricing?.durationPlans || [],
+    [activePlacementPricing]
+  );
   const selectedPlan = useMemo(
     () => durationPlans.find((plan) => plan.days === Number(form.durationDays)),
     [durationPlans, form.durationDays]
   );
+  const bannerPreviewUrl = getBannerPreviewUrl(form.imageUrl);
   const usingTestMode = isTestRazorpayKey(razorpayKeyId);
+
+  const openRazorpayCheckout = async ({ ad, order, razorpayKey }) => {
+    const Razorpay = await loadRazorpayScript();
+
+    if (!Razorpay) {
+      throw new Error("Razorpay checkout is unavailable in this browser.");
+    }
+
+    const checkout = new Razorpay({
+      key: razorpayKey,
+      amount: order.amount,
+      currency: order.currency,
+      name: form.title || "Advertisement Request",
+      description: `${placementLabels[form.placement] || form.placement} for ${selectedPlan?.days || 0} day${selectedPlan?.days > 1 ? "s" : ""}`,
+      order_id: order.id,
+      image: String(ad.imageUrl || "").startsWith("http") ? ad.imageUrl : undefined,
+      prefill: {
+        name: form.advertiserName,
+        email: form.advertiserEmail,
+        contact: form.advertiserPhone,
+      },
+      notes: {
+        placement: placementLabels[form.placement] || form.placement,
+        campaign: form.title,
+        banner_image: ad.imageUrl || "",
+      },
+      theme: {
+        color: "#f97316",
+      },
+      modal: {
+        ondismiss: () => {
+          setPopup({
+            type: "error",
+            title: "Payment not completed",
+            message: "Your advertisement request was saved, but the Razorpay payment was not completed.",
+          });
+          setSubmitting(false);
+        },
+      },
+      handler: async (response) => {
+        setPopup({
+          type: "loading",
+          title: "Verifying payment",
+          message: "We are verifying your Razorpay payment and forwarding the request to the super admin dashboard.",
+          persistent: true,
+        });
+
+        try {
+          await http.post(`/ads/${ad._id}/verify-payment`, {
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature,
+          });
+
+          setPopup({
+            type: "success",
+            title: "Request submitted",
+            message:
+              "Payment was successful. Your advertisement request is now waiting for super admin approval before it appears on the home page.",
+          });
+          setForm((current) => ({
+            ...initialForm,
+            placement: current.placement,
+            durationDays: placementPricing[current.placement]?.durationPlans?.[0]?.days || 1,
+          }));
+        } catch (verificationError) {
+          setPopup({
+            type: "error",
+            title: "Verification failed",
+            message:
+              verificationError.response?.data?.message ||
+              "Payment was received but verification failed. Please contact support with your payment details.",
+          });
+        } finally {
+          setSubmitting(false);
+        }
+      },
+    });
+
+    checkout.open();
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -94,7 +187,7 @@ export const AdvertisePage = () => {
       setPopup({
         type: "error",
         title: "Choose a duration",
-        message: "Please select one of the available home page duration plans before continuing.",
+        message: "Please select one of the available duration plans before continuing.",
       });
       return;
     }
@@ -108,7 +201,26 @@ export const AdvertisePage = () => {
       return;
     }
 
+    if (!bannerPreviewUrl) {
+      setPopup({
+        type: "error",
+        title: "Banner required",
+        message: "Please upload your advertisement banner or provide a banner image URL before continuing.",
+      });
+      return;
+    }
+
+    setCheckoutDraft({
+      bannerPreviewUrl,
+      placementLabel: placementLabels[form.placement] || form.placement,
+    });
+  };
+
+  const confirmCheckout = async () => {
+    if (!selectedPlan) return;
+
     setSubmitting(true);
+    setCheckoutDraft(null);
     setPopup({
       type: "loading",
       title: "Creating payment order",
@@ -122,83 +234,11 @@ export const AdvertisePage = () => {
         durationDays: selectedPlan.days,
       });
 
-      const Razorpay = await loadRazorpayScript();
-
-      if (!Razorpay) {
-        throw new Error("Razorpay checkout is unavailable in this browser.");
-      }
-
-      const checkout = new Razorpay({
-        key: data.razorpayKeyId,
-        amount: data.order.amount,
-        currency: data.order.currency,
-        name: "Palamu Express",
-        description: `${selectedPlan.label} advertisement request`,
-        order_id: data.order.id,
-        image: data.ad.imageUrl,
-        prefill: {
-          name: form.advertiserName,
-          email: form.advertiserEmail,
-          contact: form.advertiserPhone,
-        },
-        notes: {
-          placement: placementLabels[form.placement] || form.placement,
-          campaign: form.title,
-        },
-        theme: {
-          color: "#f97316",
-        },
-        modal: {
-          ondismiss: () => {
-            setPopup({
-              type: "error",
-              title: "Payment not completed",
-              message: "Your advertisement request was saved, but the Razorpay payment was not completed.",
-            });
-            setSubmitting(false);
-          },
-        },
-        handler: async (response) => {
-          setPopup({
-            type: "loading",
-            title: "Verifying payment",
-            message: "We are verifying your Razorpay payment and forwarding the request to the super admin dashboard.",
-            persistent: true,
-          });
-
-          try {
-            await http.post(`/ads/${data.ad._id}/verify-payment`, {
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            });
-
-            setPopup({
-              type: "success",
-              title: "Request submitted",
-              message:
-                "Payment was successful. Your advertisement request is now waiting for super admin approval before it appears on the home page.",
-            });
-            setForm((current) => ({
-              ...initialForm,
-              placement: current.placement,
-              durationDays: current.durationDays,
-            }));
-          } catch (verificationError) {
-            setPopup({
-              type: "error",
-              title: "Verification failed",
-              message:
-                verificationError.response?.data?.message ||
-                "Payment was received but verification failed. Please contact support with your payment details.",
-            });
-          } finally {
-            setSubmitting(false);
-          }
-        },
+      await openRazorpayCheckout({
+        ad: data.ad,
+        order: data.order,
+        razorpayKey: data.razorpayKeyId,
       });
-
-      checkout.open();
     } catch (error) {
       setPopup({
         type: "error",
@@ -219,6 +259,46 @@ export const AdvertisePage = () => {
         persistent={popup?.persistent}
         onClose={popup?.persistent ? undefined : () => setPopup(null)}
       />
+
+      {checkoutDraft ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-[32px] border border-orange-300/20 bg-slate-950/95 p-6 shadow-[0_32px_80px_rgba(15,23,42,0.45)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">Checkout Preview</p>
+                <h2 className="mt-3 text-2xl font-semibold text-white">Confirm banner before payment</h2>
+              </div>
+              <button type="button" onClick={() => setCheckoutDraft(null)} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+              <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="flex h-72 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
+                  <img src={checkoutDraft.bannerPreviewUrl} alt={form.title || "Advertisement banner preview"} className="h-full w-full object-contain" />
+                </div>
+              </div>
+              <div className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+                <p className="text-lg font-semibold text-white">{form.title || "Advertisement request"}</p>
+                <p className="text-sm leading-6 text-slate-400">{form.description || "No campaign description added."}</p>
+                <div className="grid gap-2 text-sm text-slate-400">
+                  <p>Placement: <span className="text-white">{checkoutDraft.placementLabel}</span></p>
+                  <p>Duration: <span className="text-white">{selectedPlan?.days} day{selectedPlan?.days > 1 ? "s" : ""}</span></p>
+                  <p>Amount: <span className="text-white">{formatCurrency(selectedPlan?.amount)}</span></p>
+                  <p>Banner source: <span className="text-white">{String(form.imageUrl || "").startsWith("http") ? "Image URL" : "Uploaded image"}</span></p>
+                </div>
+                <p className="rounded-2xl border border-orange-300/20 bg-orange-500/10 p-4 text-sm leading-6 text-orange-100">
+                  This campaign banner preview is shown before Razorpay opens. If your banner uses a direct image URL, the same image is also passed to Razorpay as the checkout logo.
+                </p>
+                <button type="button" onClick={confirmCheckout} disabled={submitting} className="w-full rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white disabled:opacity-60">
+                  {submitting ? "Preparing..." : `Continue to Razorpay for ${formatCurrency(selectedPlan?.amount)}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="panel overflow-hidden">
         <div className="grid gap-8 p-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -250,29 +330,29 @@ export const AdvertisePage = () => {
             </div>
           </div>
 
-        <div className="rounded-[32px] border border-orange-300/20 bg-gradient-to-br from-orange-500/12 via-slate-950 to-slate-950 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-200">Available plans</p>
-          {usingTestMode ? (
-            <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
-              Razorpay test mode is active. Use test credentials and sandbox payments only. These payments do not create real settlements.
-            </div>
-          ) : null}
-          <div className="mt-5 space-y-3">
-              {durationPlans.map((plan) => (
+          <div className="rounded-[32px] border border-orange-300/20 bg-gradient-to-br from-orange-500/12 via-slate-950 to-slate-950 p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-200">Placement pricing</p>
+            {usingTestMode ? (
+              <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
+                Razorpay test mode is active. Use test credentials and sandbox payments only. These payments do not create real settlements.
+              </div>
+            ) : null}
+            <div className="mt-5 space-y-3">
+              {Object.entries(placementPricing).map(([placement, pricing]) => (
                 <div
-                  key={plan.days}
-                  className={`rounded-3xl border p-4 ${plan.days === selectedPlan?.days ? "border-orange-300/40 bg-orange-500/10" : "border-white/10 bg-white/[0.03]"}`}
+                  key={placement}
+                  className={`rounded-3xl border p-4 ${placement === form.placement ? "border-orange-300/40 bg-orange-500/10" : "border-white/10 bg-white/[0.03]"}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-base font-semibold text-white">{plan.label}</p>
-                      <p className="mt-1 text-sm text-slate-400">{plan.days} day{plan.days > 1 ? "s" : ""} on the Palamu Express home page</p>
+                      <p className="text-base font-semibold text-white">{pricing.shortLabel || placementLabels[placement]}</p>
+                      <p className="mt-1 text-sm text-slate-400">Starting from {formatCurrency(pricing.baseDailyRate)} per day</p>
                     </div>
-                    <p className="text-lg font-semibold text-orange-200">{formatCurrency(plan.amount)}</p>
+                    <p className="text-sm font-semibold text-orange-200">{placement === form.placement ? "Selected" : "Available"}</p>
                   </div>
                 </div>
               ))}
-              {!durationPlans.length && !loadingOptions ? (
+              {!Object.keys(placementPricing).length && !loadingOptions ? (
                 <p className="rounded-3xl border border-rose-300/20 bg-rose-500/10 p-4 text-sm text-rose-200">
                   No pricing plans are configured yet.
                 </p>
@@ -345,7 +425,7 @@ export const AdvertisePage = () => {
             <input
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
               placeholder="Optional banner image URL"
-              value={form.imageUrl.startsWith("data:") ? "" : form.imageUrl}
+              value={String(form.imageUrl || "").startsWith("data:") ? "" : form.imageUrl}
               onChange={(event) => setForm({ ...form, imageUrl: event.target.value })}
             />
             <input
@@ -361,7 +441,11 @@ export const AdvertisePage = () => {
             <select
               className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
               value={form.placement}
-              onChange={(event) => setForm({ ...form, placement: event.target.value })}
+              onChange={(event) => {
+                const nextPlacement = event.target.value;
+                const nextDuration = placementPricing[nextPlacement]?.durationPlans?.[0]?.days || 1;
+                setForm({ ...form, placement: nextPlacement, durationDays: nextDuration });
+              }}
             >
               {Object.entries(placementLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -376,7 +460,7 @@ export const AdvertisePage = () => {
               disabled={loadingOptions || !durationPlans.length}
             >
               {durationPlans.map((plan) => (
-                <option key={plan.days} value={plan.days}>
+                <option key={`${form.placement}-${plan.days}`} value={plan.days}>
                   {plan.label}
                 </option>
               ))}
@@ -405,7 +489,7 @@ export const AdvertisePage = () => {
             {submitting
               ? "Processing..."
               : selectedPlan
-                ? `Pay ${formatCurrency(selectedPlan.amount)} and submit request`
+                ? `Review banner and pay ${formatCurrency(selectedPlan.amount)}`
                 : "Submit request"}
           </button>
         </form>
@@ -414,10 +498,20 @@ export const AdvertisePage = () => {
           <div className="panel p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">Selected campaign</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">{form.title || "Your campaign preview"}</h2>
+            {bannerPreviewUrl ? (
+              <div className="mt-5 flex h-56 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                <img src={bannerPreviewUrl} alt={form.title || "Campaign banner preview"} className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="mt-5 flex h-56 items-center justify-center rounded-2xl border border-dashed border-white/15 text-sm text-slate-400">
+                Your banner preview will appear here before checkout.
+              </div>
+            )}
             <div className="mt-5 grid gap-3 text-sm text-slate-400">
               <p>Placement: <span className="text-white">{placementLabels[form.placement] || "-"}</span></p>
               <p>Duration: <span className="text-white">{selectedPlan ? `${selectedPlan.days} days` : "-"}</span></p>
               <p>Amount: <span className="text-white">{selectedPlan ? formatCurrency(selectedPlan.amount) : "-"}</span></p>
+              <p>Base rate: <span className="text-white">{activePlacementPricing ? `${formatCurrency(activePlacementPricing.baseDailyRate)} per day` : "-"}</span></p>
               <p>Target URL: <span className="text-white">{form.targetUrl || "Optional, can be left blank"}</span></p>
             </div>
             {form.targetUrl ? (
@@ -436,10 +530,10 @@ export const AdvertisePage = () => {
           <div className="panel p-6">
             <h3 className="text-xl font-semibold text-white">Approval flow</h3>
             <div className="mt-5 space-y-4 text-sm leading-7 text-slate-400">
-              <p>1. You submit campaign details and choose a home page retention plan.</p>
-              <p>2. Razorpay collects the payment securely for the selected duration.</p>
-              <p>3. The payment-verified request appears in the super admin dashboard for approval.</p>
-              <p>4. After approval, the banner publishes on the home page and remains active for the selected number of days.</p>
+              <p>1. You select the homepage placement and how many days the ad should stay live.</p>
+              <p>2. Pricing updates automatically from the selected placement: Rs. 299/day district strip, Rs. 499/day latest updates, Rs. 699/day hero rail.</p>
+              <p>3. After payment verification, the request appears in the super admin dashboard for review.</p>
+              <p>4. Once approved, the banner publishes on the homepage and expires automatically after the selected duration.</p>
             </div>
           </div>
 

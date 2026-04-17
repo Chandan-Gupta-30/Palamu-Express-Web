@@ -33,12 +33,25 @@ export const adPlacements = {
   HOMEPAGE_DISTRICT: "homepage-district",
 };
 
-export const adDurationPlans = [
-  { days: 3, amount: 499, label: "3 Days Launch" },
-  { days: 7, amount: 999, label: "7 Days Spotlight" },
-  { days: 15, amount: 1799, label: "15 Days Prime Reach" },
-  { days: 30, amount: 2999, label: "30 Days Home Page Presence" },
-];
+export const adDurationOptions = [1, 3, 7, 15, 30];
+
+export const adPlacementPricing = {
+  [adPlacements.HOMEPAGE_DISTRICT]: {
+    baseDailyRate: 299,
+    label: "District Coverage Sponsor Strip",
+    shortLabel: "District Sponsor Rail Strip",
+  },
+  [adPlacements.HOMEPAGE_LATEST]: {
+    baseDailyRate: 499,
+    label: "Latest Updates Sponsor Grid",
+    shortLabel: "Latest Update Sponsor Section",
+  },
+  [adPlacements.HOMEPAGE_HERO]: {
+    baseDailyRate: 699,
+    label: "Homepage Hero Rail",
+    shortLabel: "Homepage Hero Rail",
+  },
+};
 
 export const jharkhandDistricts = [
   "Bokaro",

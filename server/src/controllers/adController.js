@@ -1,7 +1,7 @@
 import { StatusCodes } from "http-status-codes";
 import { Advertisement } from "../models/Advertisement.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { adDurationPlans, adPlacements, adStatuses } from "../utils/constants.js";
+import { adDurationOptions, adPlacementPricing, adPlacements, adStatuses } from "../utils/constants.js";
 import { createAdOrder, verifyRazorpayPaymentSignature } from "../services/paymentService.js";
 import { uploadBase64Asset } from "../services/uploadService.js";
 import { env } from "../config/env.js";
@@ -22,14 +22,35 @@ const buildHttpError = (message, statusCode = StatusCodes.BAD_REQUEST) => {
   return error;
 };
 
-const formatDurationPlan = (plan) => ({
-  ...plan,
-  currency: "INR",
-});
+const resolvePlacementPricing = (placement) => adPlacementPricing[normalizePlacementValue(placement)] || adPlacementPricing[adPlacements.HOMEPAGE_LATEST];
 
-const getDurationPlan = (durationDays) => {
+const buildPlacementDurationPlans = (placement) => {
+  const pricing = resolvePlacementPricing(placement);
+
+  return adDurationOptions.map((days) => ({
+    days,
+    amount: pricing.baseDailyRate * days,
+    label: `${days} Day${days > 1 ? "s" : ""}`,
+    placement,
+    placementLabel: pricing.label,
+    currency: "INR",
+  }));
+};
+
+const getPlanForSelection = (placement, durationDays) => {
+  const normalizedPlacement = normalizePlacementValue(placement);
   const days = Number(durationDays || 0);
-  return adDurationPlans.find((plan) => plan.days === days);
+  if (!adDurationOptions.includes(days)) return null;
+
+  const pricing = resolvePlacementPricing(normalizedPlacement);
+  return {
+    placement: normalizedPlacement,
+    days,
+    amount: pricing.baseDailyRate * days,
+    label: `${days} Day${days > 1 ? "s" : ""}`,
+    placementLabel: pricing.label,
+    currency: "INR",
+  };
 };
 
 const normalizeAdvertisementRecord = (ad) => {
@@ -125,7 +146,7 @@ const normalizePublicAdvertisementInput = async (payload = {}) => {
     throw buildHttpError("Please enter a valid advertiser email address.");
   }
 
-  const plan = getDurationPlan(durationDays);
+  const plan = getPlanForSelection(placement, durationDays);
   if (!plan) {
     throw buildHttpError("Please choose one of the available duration plans.");
   }
@@ -160,7 +181,14 @@ const buildAdSchedule = (status, durationDays, existingStartsAt) => {
 export const getAdvertisementFormOptions = asyncHandler(async (req, res) => {
   res.json({
     placements: Object.values(adPlacements),
-    durationPlans: adDurationPlans.map(formatDurationPlan),
+    placementPricing: Object.entries(adPlacementPricing).reduce((accumulator, [placement, pricing]) => {
+      accumulator[placement] = {
+        ...pricing,
+        durationPlans: buildPlacementDurationPlans(placement),
+      };
+      return accumulator;
+    }, {}),
+    durationOptions: adDurationOptions,
     razorpayKeyId: env.razorpay.keyId || "",
   });
 });

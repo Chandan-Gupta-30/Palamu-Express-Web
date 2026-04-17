@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, FilePlus2, IdCard, KeyRound, Mic, X } from "lucide-react";
+import { Eye, EyeOff, FilePlus2, IdCard, KeyRound, Megaphone, Mic, X } from "lucide-react";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { VoiceNewsComposer } from "../components/audio/VoiceNewsComposer";
 import { MetricCard } from "../components/dashboard/MetricCard";
@@ -328,6 +328,7 @@ export const DashboardPage = () => {
   const [showCredentialForm, setShowCredentialForm] = useState(false);
   const [showReporterDesk, setShowReporterDesk] = useState(false);
   const [showVoiceDesk, setShowVoiceDesk] = useState(false);
+  const [showAdRequestsPanel, setShowAdRequestsPanel] = useState(false);
 
   const articleBlocks = useMemo(
     () => (articleForm.district ? jharkhandBlocksByDistrict[articleForm.district] || [] : []),
@@ -337,6 +338,10 @@ export const DashboardPage = () => {
   const selectedPlacement = useMemo(
     () => adPlacements.find((placement) => placement.value === adForm.placement),
     [adForm.placement]
+  );
+  const pendingAdRequestsCount = useMemo(
+    () => ads.filter((ad) => ad.status === "pending_approval").length,
+    [ads]
   );
 
   const canAccessNewsDesk = user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified);
@@ -1865,69 +1870,107 @@ export const DashboardPage = () => {
               </form>
             </div>
 
-            <div className="panel p-6">
-              <h2 className="text-2xl font-semibold text-white">Advertisement Requests</h2>
-              <div className="mt-5 space-y-4">
-                {ads.map((ad) => (
-                  <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    {ad.imageUrl ? (
-                      <div className="overflow-hidden rounded-2xl">
-                        <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-cover object-center" />
-                      </div>
-                    ) : null}
-                    <div className="mt-4 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-white">{ad.title}</p>
-                        <p className="mt-1 text-sm text-slate-500">{adPlacements.find((placement) => placement.value === ad.placement)?.label || ad.placement}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{ad.status}</span>
-                        <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">{ad.paymentStatus || "pending"}</span>
-                      </div>
-                    </div>
-                    {ad.description ? <p className="mt-3 text-sm leading-6 text-slate-400">{ad.description}</p> : null}
-                    <div className="mt-4 grid gap-2 text-sm text-slate-500">
-                      <p>Advertiser: {ad.advertiserName || "-"}</p>
-                      <p>Email: {ad.advertiserEmail || "-"}</p>
-                      <p>Phone: {ad.advertiserPhone || "-"}</p>
-                      <p>Company: {ad.companyName || "-"}</p>
-                      <p>Priority: {ad.priority}</p>
-                      <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
-                      <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
-                      <p>Target URL: {ad.targetUrl || "Not provided"}</p>
-                      <p>Paid At: {formatDate(ad.paidAt)}</p>
-                      <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
-                      {ad.notes ? <p>Notes: {ad.notes}</p> : null}
-                      {ad.rejectionReason ? <p>Review note: {ad.rejectionReason}</p> : null}
-                    </div>
-                    {ad.status === "pending_approval" ? (
-                      <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="2" placeholder="Optional approval or rejection note" value={feedbacks[`ad-${ad._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`ad-${ad._id}`]: event.target.value })} />
-                    ) : null}
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      {ad.status === "pending_approval" ? (
-                        <button type="button" onClick={() => approveAd(ad._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">
-                          Approve & Publish
-                        </button>
-                      ) : null}
-                      {ad.status === "pending_approval" ? (
-                        <button type="button" onClick={() => rejectAd(ad._id)} className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white">
-                          Reject
-                        </button>
-                      ) : null}
-                      <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
-                        Edit
-                      </button>
-                      <button type="button" onClick={() => deleteAd(ad._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {!ads.length ? <p className="text-slate-500">No advertisement requests are available yet.</p> : null}
-              </div>
-            </div>
           </div>
         </div>
+      ) : null}
+
+      {user?.role === "super_admin" ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowAdRequestsPanel(true)}
+            className="fixed bottom-6 right-6 z-[70] inline-flex items-center gap-3 rounded-full border border-orange-300/35 bg-slate-950/95 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-orange-300/60 hover:bg-slate-900"
+          >
+            <Megaphone className="h-5 w-5 text-orange-300" />
+            <span>Ad Requests</span>
+            {pendingAdRequestsCount ? (
+              <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-bold text-white">{pendingAdRequestsCount}</span>
+            ) : null}
+          </button>
+
+          {showAdRequestsPanel ? (
+            <div className="fixed inset-0 z-[85] flex justify-end bg-slate-950/70 px-4 py-4 backdrop-blur-sm">
+              <div className="voice-desk-scroll w-full max-w-2xl rounded-[32px] border border-white/10 bg-slate-950/95 p-6 shadow-[0_32px_80px_rgba(15,23,42,0.45)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">Super Admin Queue</p>
+                    <h2 className="mt-3 text-2xl font-semibold text-white">Advertisement Requests</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">
+                      Paid advertisement requests stay hidden from the dashboard until you open this review panel.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdRequestsPanel(false)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:border-white/20 hover:text-white"
+                    aria-label="Close advertisement requests panel"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {ads.map((ad) => (
+                    <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      {ad.imageUrl ? (
+                        <div className="overflow-hidden rounded-2xl">
+                          <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-cover object-center" />
+                        </div>
+                      ) : null}
+                      <div className="mt-4 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-white">{ad.title}</p>
+                          <p className="mt-1 text-sm text-slate-500">{adPlacements.find((placement) => placement.value === ad.placement)?.label || ad.placement}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{ad.status}</span>
+                          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">{ad.paymentStatus || "pending"}</span>
+                        </div>
+                      </div>
+                      {ad.description ? <p className="mt-3 text-sm leading-6 text-slate-400">{ad.description}</p> : null}
+                      <div className="mt-4 grid gap-2 text-sm text-slate-500">
+                        <p>Advertiser: {ad.advertiserName || "-"}</p>
+                        <p>Email: {ad.advertiserEmail || "-"}</p>
+                        <p>Phone: {ad.advertiserPhone || "-"}</p>
+                        <p>Company: {ad.companyName || "-"}</p>
+                        <p>Priority: {ad.priority}</p>
+                        <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
+                        <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
+                        <p>Target URL: {ad.targetUrl || "Not provided"}</p>
+                        <p>Paid At: {formatDate(ad.paidAt)}</p>
+                        <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
+                        {ad.notes ? <p>Notes: {ad.notes}</p> : null}
+                        {ad.rejectionReason ? <p>Review note: {ad.rejectionReason}</p> : null}
+                      </div>
+                      {ad.status === "pending_approval" ? (
+                        <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="2" placeholder="Optional approval or rejection note" value={feedbacks[`ad-${ad._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`ad-${ad._id}`]: event.target.value })} />
+                      ) : null}
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        {ad.status === "pending_approval" ? (
+                          <button type="button" onClick={() => approveAd(ad._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">
+                            Approve & Publish
+                          </button>
+                        ) : null}
+                        {ad.status === "pending_approval" ? (
+                          <button type="button" onClick={() => rejectAd(ad._id)} className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white">
+                            Reject
+                          </button>
+                        ) : null}
+                        <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => deleteAd(ad._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!ads.length ? <p className="text-slate-500">No advertisement requests are available yet.</p> : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
