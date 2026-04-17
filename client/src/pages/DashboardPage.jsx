@@ -17,9 +17,11 @@ const adPlacements = [
 ];
 
 const adStatuses = [
+  { value: "pending_payment", label: "Pending Payment" },
+  { value: "pending_approval", label: "Pending Approval" },
   { value: "active", label: "Active" },
   { value: "expired", label: "Expired" },
-  { value: "rejected", label: "Hidden" },
+  { value: "rejected", label: "Rejected" },
 ];
 
 const managedRoleOptions = [
@@ -51,6 +53,10 @@ const initialArticleForm = {
 };
 
 const initialAdForm = {
+  advertiserName: "",
+  advertiserEmail: "",
+  advertiserPhone: "",
+  companyName: "",
   title: "",
   description: "",
   imageUrl: "",
@@ -60,6 +66,7 @@ const initialAdForm = {
   amount: 1500,
   priority: 10,
   ctaLabel: "Visit Sponsor",
+  notes: "",
   status: "active",
 };
 
@@ -683,6 +690,10 @@ export const DashboardPage = () => {
   const startEditAd = (ad) => {
     setEditingAdId(ad._id);
     setAdForm({
+      advertiserName: ad.advertiserName || "",
+      advertiserEmail: ad.advertiserEmail || "",
+      advertiserPhone: ad.advertiserPhone || "",
+      companyName: ad.companyName || "",
       title: ad.title || "",
       description: ad.description || "",
       imageUrl: ad.imageUrl || "",
@@ -692,6 +703,7 @@ export const DashboardPage = () => {
       amount: ad.amount || 0,
       priority: ad.priority || 10,
       ctaLabel: ad.ctaLabel || "Visit Sponsor",
+      notes: ad.notes || "",
       status: ad.status || "active",
     });
     setTimeout(() => {
@@ -711,6 +723,22 @@ export const DashboardPage = () => {
       }
       refreshAdminData();
     }, "Advertisement deleted.");
+  };
+
+  const approveAd = async (adId) => {
+    await handleAction(async () => {
+      await http.patch(`/ads/${adId}/approve`);
+      refreshAdminData();
+    }, "Advertisement approved and published.");
+  };
+
+  const rejectAd = async (adId) => {
+    const reason = feedbacks[`ad-${adId}`] || "Advertisement was rejected during review.";
+    if (!window.confirm("Reject this advertisement request?")) return;
+    await handleAction(async () => {
+      await http.patch(`/ads/${adId}/reject`, { reason });
+      refreshAdminData();
+    }, "Advertisement rejected.");
   };
 
   const startEditManagedUser = (managedUser) => {
@@ -1759,6 +1787,12 @@ export const DashboardPage = () => {
                 ) : null}
               </div>
               <form onSubmit={submitAd} className="mt-5 grid gap-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Advertiser name" value={adForm.advertiserName} onChange={(event) => setAdForm({ ...adForm, advertiserName: event.target.value })} />
+                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Advertiser email" value={adForm.advertiserEmail} onChange={(event) => setAdForm({ ...adForm, advertiserEmail: event.target.value })} />
+                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Advertiser phone" value={adForm.advertiserPhone} onChange={(event) => setAdForm({ ...adForm, advertiserPhone: event.target.value })} />
+                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Company or brand name" value={adForm.companyName} onChange={(event) => setAdForm({ ...adForm, companyName: event.target.value })} />
+                </div>
                 <div>
                   <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Campaign title, for example Palamu Trade Fair 2026" value={adForm.title} onChange={(event) => setAdForm({ ...adForm, title: event.target.value })} />
                   <p className="mt-2 text-xs text-slate-500">Use a short sponsor title that is easy to recognize on the homepage.</p>
@@ -1806,7 +1840,7 @@ export const DashboardPage = () => {
                         </option>
                       ))}
                     </select>
-                    <p className="mt-2 text-xs text-slate-500">Set to Active to publish it on the homepage immediately.</p>
+                    <p className="mt-2 text-xs text-slate-500">Use Pending Approval for paid requests waiting on review, or Active to publish immediately.</p>
                   </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
@@ -1823,12 +1857,16 @@ export const DashboardPage = () => {
                     <p className="mt-2 text-xs text-slate-500">Priority decides ordering inside the selected homepage placement.</p>
                   </div>
                 </div>
+                <div>
+                  <textarea className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="3" placeholder="Optional internal notes or advertiser remarks" value={adForm.notes} onChange={(event) => setAdForm({ ...adForm, notes: event.target.value })} />
+                  <p className="mt-2 text-xs text-slate-500">Useful for approval notes, invoice references, or campaign instructions.</p>
+                </div>
                 <button className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white">{busyAction ? "Saving..." : editingAdId ? "Update Advertisement" : "Publish Advertisement"}</button>
               </form>
             </div>
 
             <div className="panel p-6">
-              <h2 className="text-2xl font-semibold text-white">Published Ads</h2>
+              <h2 className="text-2xl font-semibold text-white">Advertisement Requests</h2>
               <div className="mt-5 space-y-4">
                 {ads.map((ad) => (
                   <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
@@ -1842,16 +1880,40 @@ export const DashboardPage = () => {
                         <p className="font-semibold text-white">{ad.title}</p>
                         <p className="mt-1 text-sm text-slate-500">{adPlacements.find((placement) => placement.value === ad.placement)?.label || ad.placement}</p>
                       </div>
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{ad.status}</span>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{ad.status}</span>
+                        <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">{ad.paymentStatus || "pending"}</span>
+                      </div>
                     </div>
                     {ad.description ? <p className="mt-3 text-sm leading-6 text-slate-400">{ad.description}</p> : null}
                     <div className="mt-4 grid gap-2 text-sm text-slate-500">
+                      <p>Advertiser: {ad.advertiserName || "-"}</p>
+                      <p>Email: {ad.advertiserEmail || "-"}</p>
+                      <p>Phone: {ad.advertiserPhone || "-"}</p>
+                      <p>Company: {ad.companyName || "-"}</p>
                       <p>Priority: {ad.priority}</p>
                       <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
                       <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
+                      <p>Target URL: {ad.targetUrl || "Not provided"}</p>
+                      <p>Paid At: {formatDate(ad.paidAt)}</p>
                       <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
+                      {ad.notes ? <p>Notes: {ad.notes}</p> : null}
+                      {ad.rejectionReason ? <p>Review note: {ad.rejectionReason}</p> : null}
                     </div>
-                    <div className="mt-4 flex gap-3">
+                    {ad.status === "pending_approval" ? (
+                      <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="2" placeholder="Optional approval or rejection note" value={feedbacks[`ad-${ad._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`ad-${ad._id}`]: event.target.value })} />
+                    ) : null}
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {ad.status === "pending_approval" ? (
+                        <button type="button" onClick={() => approveAd(ad._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">
+                          Approve & Publish
+                        </button>
+                      ) : null}
+                      {ad.status === "pending_approval" ? (
+                        <button type="button" onClick={() => rejectAd(ad._id)} className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white">
+                          Reject
+                        </button>
+                      ) : null}
                       <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
                         Edit
                       </button>
@@ -1861,7 +1923,7 @@ export const DashboardPage = () => {
                     </div>
                   </div>
                 ))}
-                {!ads.length ? <p className="text-slate-500">No ads created yet.</p> : null}
+                {!ads.length ? <p className="text-slate-500">No advertisement requests are available yet.</p> : null}
               </div>
             </div>
           </div>

@@ -32,6 +32,7 @@ export const Header = ({ darkMode, onToggleDarkMode }) => {
         <nav className="hidden gap-6 text-sm md:flex">
           <NavLink to="/" end className={navLinkClassName}>Home</NavLink>
           <NavLink to="/search" className={navLinkClassName}>Search</NavLink>
+          <NavLink to="/advertise-with-us" className={navLinkClassName}>Advertise</NavLink>
           {user ? <NavLink to="/saved" className={navLinkClassName}>Saved</NavLink> : null}
           {canAccessDashboard(user) ? <NavLink to="/dashboard" className={navLinkClassName}>Dashboard</NavLink> : null}
         </nav>
@@ -74,6 +75,7 @@ export const Header = ({ darkMode, onToggleDarkMode }) => {
             <nav className="grid gap-3 text-sm">
               <NavLink to="/" end className={navLinkClassName} onClick={closeMobileMenu}>Home</NavLink>
               <NavLink to="/search" className={navLinkClassName} onClick={closeMobileMenu}>Search</NavLink>
+              <NavLink to="/advertise-with-us" className={navLinkClassName} onClick={closeMobileMenu}>Advertise</NavLink>
               {user ? <NavLink to="/saved" className={navLinkClassName} onClick={closeMobileMenu}>Saved</NavLink> : null}
               {canAccessDashboard(user) ? <NavLink to="/dashboard" className={navLinkClassName} onClick={closeMobileMenu}>Dashboard</NavLink> : null}
             </nav>

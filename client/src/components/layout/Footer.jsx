@@ -5,6 +5,7 @@ const quickLinks = [
   { label: "Home", to: "/" },
   { label: "Search", to: "/search" },
   { label: "Enrollment", to: "/register" },
+  { label: "Advertise With Us", to: "/advertise-with-us" },
   { label: "Login", to: "/login" },
   { label: "Contact Us", to: "/contact" },
   { label: "Privacy Policy", to: "/privacy-policy" },
@@ -27,6 +28,9 @@ export const Footer = () => (
           <p className="max-w-xl text-sm leading-7 text-slate-400">
             Independent district-first reporting across Jharkhand with local updates, breaking news coverage, editorial review,
             and a publishing desk built for fast and credible regional journalism.
+          </p>
+          <p className="max-w-xl text-sm leading-7 text-slate-400">
+            Palamu Express is owned and operated or managed by Chandan Gupta.
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -90,6 +94,9 @@ export const Footer = () => (
           </Link>
           <Link to="/contact" className="text-sm text-slate-500 transition hover:text-orange-300">
             Contact Us
+          </Link>
+          <Link to="/advertise-with-us" className="text-sm text-slate-500 transition hover:text-orange-300">
+            Advertise With Us
           </Link>
         </div>
         <p className="text-sm text-slate-500">

@@ -1,8 +1,10 @@
 import { StatusCodes } from "http-status-codes";
 import { Advertisement } from "../models/Advertisement.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { adPlacements, adStatuses } from "../utils/constants.js";
-import { createAdOrder } from "../services/paymentService.js";
+import { adDurationPlans, adPlacements, adStatuses } from "../utils/constants.js";
+import { createAdOrder, verifyRazorpayPaymentSignature } from "../services/paymentService.js";
+import { uploadBase64Asset } from "../services/uploadService.js";
+import { env } from "../config/env.js";
 
 const normalizePlacementValue = (placement) => {
   const value = String(placement || "").trim();
@@ -14,38 +16,44 @@ const normalizePlacementValue = (placement) => {
   return adPlacements.HOMEPAGE_LATEST;
 };
 
-const normalizeAdvertisementRecord = (ad) => {
-  if (!ad) return ad;
-
-  const normalizedPlacement = normalizePlacementValue(ad.placement);
-  if (ad.placement !== normalizedPlacement) {
-    ad.placement = normalizedPlacement;
-  }
-
-  if (!ad.ctaLabel) {
-    ad.ctaLabel = "Visit Sponsor";
-  }
-
-  if (!ad.priority) {
-    ad.priority = 100;
-  }
-
-  if (!ad.description) {
-    ad.description = "";
-  }
-
-  return ad;
-};
-
 const buildHttpError = (message, statusCode = StatusCodes.BAD_REQUEST) => {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
 };
 
-const normalizeAdvertisementInput = (payload = {}) => {
+const formatDurationPlan = (plan) => ({
+  ...plan,
+  currency: "INR",
+});
+
+const getDurationPlan = (durationDays) => {
+  const days = Number(durationDays || 0);
+  return adDurationPlans.find((plan) => plan.days === days);
+};
+
+const normalizeAdvertisementRecord = (ad) => {
+  if (!ad) return ad;
+
+  const normalizedPlacement = normalizePlacementValue(ad.placement);
+  const record = typeof ad.toObject === "function" ? ad.toObject() : { ...ad };
+
+  return {
+    ...record,
+    placement: normalizedPlacement,
+    ctaLabel: record.ctaLabel || "Visit Sponsor",
+    priority: record.priority || 100,
+    description: record.description || "",
+    targetUrl: record.targetUrl || "",
+    companyName: record.companyName || "",
+    notes: record.notes || "",
+    rejectionReason: record.rejectionReason || "",
+  };
+};
+
+const normalizeAdminAdvertisementInput = async (payload = {}, user) => {
   const title = String(payload.title || "").trim();
-  const imageUrl = String(payload.imageUrl || "").trim();
+  const imageUrl = await uploadBase64Asset(String(payload.imageUrl || "").trim(), "palamu-express/ads");
   const targetUrl = String(payload.targetUrl || "").trim();
   const placement = normalizePlacementValue(payload.placement);
   const description = String(payload.description || "").trim();
@@ -53,16 +61,23 @@ const normalizeAdvertisementInput = (payload = {}) => {
   const durationDays = Number(payload.durationDays || 0);
   const amount = Number(payload.amount || 0);
   const priority = Number(payload.priority || 100);
-  const requestedStatus = payload.status;
+  const requestedStatus = String(payload.status || "").trim();
   const activateNow = Boolean(payload.activateNow);
+  const advertiserName = String(payload.advertiserName || user?.fullName || "Palamu Express Sponsor").trim();
+  const advertiserEmail = String(payload.advertiserEmail || user?.email || "admin@palamuexpress.in").trim().toLowerCase();
+  const advertiserPhone = String(payload.advertiserPhone || user?.phone || "").trim();
+  const companyName = String(payload.companyName || "").trim();
+  const notes = String(payload.notes || "").trim();
 
   if (!title) throw buildHttpError("Advertisement title is required.");
   if (!imageUrl) throw buildHttpError("Please provide a banner image URL or upload an image.");
-  if (!targetUrl) throw buildHttpError("Target URL is required.");
   if (!placement) throw buildHttpError("Placement is required.");
   if (!Number.isFinite(durationDays) || durationDays < 1) throw buildHttpError("Duration must be at least 1 day.");
   if (!Number.isFinite(amount) || amount < 0) throw buildHttpError("Price must be a valid non-negative number.");
   if (!Number.isFinite(priority) || priority < 1) throw buildHttpError("Priority must be 1 or greater.");
+  if (!advertiserName) throw buildHttpError("Advertiser name is required.");
+  if (!advertiserEmail) throw buildHttpError("Advertiser email is required.");
+  if (!advertiserPhone) throw buildHttpError("Advertiser phone is required.");
 
   return {
     title,
@@ -76,6 +91,59 @@ const normalizeAdvertisementInput = (payload = {}) => {
     priority,
     requestedStatus,
     activateNow,
+    advertiserName,
+    advertiserEmail,
+    advertiserPhone,
+    companyName,
+    notes,
+  };
+};
+
+const normalizePublicAdvertisementInput = async (payload = {}) => {
+  const title = String(payload.title || "").trim();
+  const imageUrl = await uploadBase64Asset(String(payload.imageUrl || "").trim(), "palamu-express/ads");
+  const targetUrl = String(payload.targetUrl || "").trim();
+  const placement = normalizePlacementValue(payload.placement);
+  const description = String(payload.description || "").trim();
+  const ctaLabel = String(payload.ctaLabel || "Visit Sponsor").trim();
+  const durationDays = Number(payload.durationDays || 0);
+  const advertiserName = String(payload.advertiserName || "").trim();
+  const advertiserEmail = String(payload.advertiserEmail || "").trim().toLowerCase();
+  const advertiserPhone = String(payload.advertiserPhone || "").trim();
+  const companyName = String(payload.companyName || "").trim();
+  const notes = String(payload.notes || "").trim();
+
+  if (!title) throw buildHttpError("Advertisement title is required.");
+  if (!imageUrl) throw buildHttpError("Please upload a banner image or paste a banner image URL.");
+  if (!placement) throw buildHttpError("Placement is required.");
+  if (!advertiserName) throw buildHttpError("Advertiser name is required.");
+  if (!advertiserEmail) throw buildHttpError("Advertiser email is required.");
+  if (!advertiserPhone) throw buildHttpError("Advertiser phone is required.");
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(advertiserEmail)) {
+    throw buildHttpError("Please enter a valid advertiser email address.");
+  }
+
+  const plan = getDurationPlan(durationDays);
+  if (!plan) {
+    throw buildHttpError("Please choose one of the available duration plans.");
+  }
+
+  return {
+    title,
+    imageUrl,
+    targetUrl,
+    placement,
+    description,
+    ctaLabel: ctaLabel || "Visit Sponsor",
+    durationDays: plan.days,
+    amount: plan.amount,
+    advertiserName,
+    advertiserEmail,
+    advertiserPhone,
+    companyName,
+    notes,
   };
 };
 
@@ -89,59 +157,140 @@ const buildAdSchedule = (status, durationDays, existingStartsAt) => {
   return { startsAt, endsAt };
 };
 
+export const getAdvertisementFormOptions = asyncHandler(async (req, res) => {
+  res.json({
+    placements: Object.values(adPlacements),
+    durationPlans: adDurationPlans.map(formatDurationPlan),
+    razorpayKeyId: env.razorpay.keyId || "",
+  });
+});
+
+export const createAdvertisementRequest = asyncHandler(async (req, res) => {
+  const input = await normalizePublicAdvertisementInput(req.body);
+
+  const ad = await Advertisement.create({
+    ...input,
+    status: adStatuses.PENDING_PAYMENT,
+    paymentStatus: "pending",
+  });
+
+  const order = await createAdOrder({
+    amount: ad.amount,
+    receipt: `ad_${ad._id}`,
+  });
+
+  ad.razorpayOrderId = order.id;
+  await ad.save();
+
+  res.status(StatusCodes.CREATED).json({
+    ad: normalizeAdvertisementRecord(ad),
+    order,
+    razorpayKeyId: env.razorpay.keyId || "",
+  });
+});
+
 export const createAdvertisement = asyncHandler(async (req, res) => {
-  const input = normalizeAdvertisementInput(req.body);
-  const status = input.activateNow ? adStatuses.ACTIVE : input.requestedStatus || adStatuses.PENDING_PAYMENT;
+  const input = await normalizeAdminAdvertisementInput(req.body, req.user);
+  const status = input.activateNow ? adStatuses.ACTIVE : input.requestedStatus || adStatuses.ACTIVE;
   const schedule = buildAdSchedule(status, input.durationDays);
 
   const ad = await Advertisement.create({
-    title: input.title,
-    imageUrl: input.imageUrl,
-    targetUrl: input.targetUrl,
-    placement: input.placement,
-    durationDays: input.durationDays,
-    amount: input.amount,
-    priority: input.priority,
-    description: input.description,
-    ctaLabel: input.ctaLabel,
-    advertiser: req.user._id,
+    ...input,
+    advertiser: req.user?._id,
     status,
+    paymentStatus: "paid",
+    paidAt: new Date(),
     ...schedule,
   });
 
-  let order = null;
-
-  if (status === adStatuses.PENDING_PAYMENT) {
-    order = await createAdOrder({
-      amount: ad.amount,
-      receipt: `ad_${ad._id}`,
-    });
-
-    ad.razorpayOrderId = order.id;
-    await ad.save();
-  }
-
-  res.status(StatusCodes.CREATED).json({ ad: normalizeAdvertisementRecord(ad), order });
+  res.status(StatusCodes.CREATED).json({ ad: normalizeAdvertisementRecord(ad), order: null });
 });
 
 export const verifyAdvertisementPayment = asyncHandler(async (req, res) => {
-  const durationDays = Number(req.body.durationDays || 7);
-  const ad = await Advertisement.findByIdAndUpdate(
-    req.params.id,
-    {
-      status: adStatuses.ACTIVE,
-      startsAt: new Date(),
-      endsAt: new Date(Date.now() + durationDays * 86400000),
-      durationDays,
-    },
-    { new: true }
-  );
+  const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    throw buildHttpError("Razorpay payment verification details are required.");
+  }
+
+  const ad = await Advertisement.findById(req.params.id);
 
   if (!ad) {
     throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
   }
 
-  res.json({ message: "Advertisement activated", ad: normalizeAdvertisementRecord(ad) });
+  if (!ad.razorpayOrderId || ad.razorpayOrderId !== razorpayOrderId) {
+    throw buildHttpError("Razorpay order mismatch. Please restart the payment flow.");
+  }
+
+  const isValidSignature = verifyRazorpayPaymentSignature({
+    orderId: razorpayOrderId,
+    paymentId: razorpayPaymentId,
+    signature: razorpaySignature,
+  });
+
+  if (!isValidSignature) {
+    ad.paymentStatus = "failed";
+    await ad.save();
+    throw buildHttpError("Payment verification failed. Please contact support if the amount was debited.");
+  }
+
+  ad.razorpayPaymentId = razorpayPaymentId;
+  ad.razorpaySignature = razorpaySignature;
+  ad.paymentStatus = "paid";
+  ad.paidAt = new Date();
+  ad.status = adStatuses.PENDING_APPROVAL;
+  await ad.save();
+
+  res.json({
+    message: "Payment verified. Your advertisement request is now pending super admin approval.",
+    ad: normalizeAdvertisementRecord(ad),
+  });
+});
+
+export const approveAdvertisement = asyncHandler(async (req, res) => {
+  const ad = await Advertisement.findById(req.params.id);
+
+  if (!ad) {
+    throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
+  }
+
+  if (ad.paymentStatus !== "paid") {
+    throw buildHttpError("Only paid advertisement requests can be approved.");
+  }
+
+  const schedule = buildAdSchedule(adStatuses.ACTIVE, ad.durationDays, new Date());
+  ad.status = adStatuses.ACTIVE;
+  ad.startsAt = schedule.startsAt;
+  ad.endsAt = schedule.endsAt;
+  ad.reviewedAt = new Date();
+  ad.reviewedBy = req.user?._id;
+  ad.rejectionReason = "";
+  await ad.save();
+
+  res.json({
+    message: "Advertisement approved and published on the homepage.",
+    ad: normalizeAdvertisementRecord(ad),
+  });
+});
+
+export const rejectAdvertisement = asyncHandler(async (req, res) => {
+  const ad = await Advertisement.findById(req.params.id);
+
+  if (!ad) {
+    throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
+  }
+
+  ad.status = adStatuses.REJECTED;
+  ad.reviewedAt = new Date();
+  ad.reviewedBy = req.user?._id;
+  ad.rejectionReason = String(req.body.reason || "Advertisement was rejected during review.").trim();
+  await ad.save();
+
+  res.json({
+    message: "Advertisement rejected.",
+    ad: normalizeAdvertisementRecord(ad),
+  });
 });
 
 export const getActiveAdvertisements = asyncHandler(async (req, res) => {
@@ -153,38 +302,46 @@ export const getActiveAdvertisements = asyncHandler(async (req, res) => {
 
   const ads = await Advertisement.find({
     status: adStatuses.ACTIVE,
+    paymentStatus: "paid",
     $or: [{ endsAt: { $gte: now } }, { endsAt: { $exists: false } }, { endsAt: null }],
   }).sort({ priority: 1, createdAt: -1 });
+
   res.json({ ads: ads.map((ad) => normalizeAdvertisementRecord(ad)) });
 });
 
 export const getAllAdvertisements = asyncHandler(async (req, res) => {
-  const ads = await Advertisement.find().sort({ status: 1, priority: 1, createdAt: -1 });
+  const ads = await Advertisement.find()
+    .populate("reviewedBy", "fullName")
+    .sort({ createdAt: -1, priority: 1 });
+
   res.json({ ads: ads.map((ad) => normalizeAdvertisementRecord(ad)) });
 });
 
 export const updateAdvertisement = asyncHandler(async (req, res) => {
   const ad = await Advertisement.findById(req.params.id);
+
   if (!ad) {
     throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
   }
 
-  const input = normalizeAdvertisementInput(req.body);
-  const status = input.activateNow ? adStatuses.ACTIVE : input.requestedStatus || ad.status;
-  const schedule = buildAdSchedule(status, input.durationDays, status === adStatuses.ACTIVE ? ad.startsAt || new Date() : undefined);
+  const input = await normalizeAdminAdvertisementInput(req.body, req.user);
+  const nextStatus = input.activateNow ? adStatuses.ACTIVE : input.requestedStatus || ad.status;
+  const schedule = buildAdSchedule(
+    nextStatus,
+    input.durationDays,
+    nextStatus === adStatuses.ACTIVE ? ad.startsAt || new Date() : undefined
+  );
 
-  ad.title = input.title;
-  ad.imageUrl = input.imageUrl;
-  ad.targetUrl = input.targetUrl;
-  ad.placement = input.placement;
-  ad.durationDays = input.durationDays;
-  ad.amount = input.amount;
-  ad.priority = input.priority;
-  ad.description = input.description;
-  ad.ctaLabel = input.ctaLabel;
-  ad.status = status;
-  ad.startsAt = schedule.startsAt;
-  ad.endsAt = schedule.endsAt;
+  Object.assign(ad, input, {
+    status: nextStatus,
+    startsAt: schedule.startsAt,
+    endsAt: schedule.endsAt,
+  });
+
+  if (nextStatus === adStatuses.ACTIVE) {
+    ad.paymentStatus = "paid";
+    ad.paidAt = ad.paidAt || new Date();
+  }
 
   await ad.save();
 

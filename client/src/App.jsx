@@ -13,6 +13,7 @@ import { SavedPage } from "./pages/SavedPage";
 import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { ContactPage } from "./pages/ContactPage";
+import { AdvertisePage } from "./pages/AdvertisePage";
 import { useAuth } from "./context/AuthContext";
 
 const canAccessDashboard = (user) =>
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms-and-conditions" element={<TermsPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/advertise-with-us" element={<AdvertisePage />} />
         <Route
           path="/saved"
           element={

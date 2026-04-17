@@ -21,6 +21,7 @@ export const approvalStatuses = {
 
 export const adStatuses = {
   PENDING_PAYMENT: "pending_payment",
+  PENDING_APPROVAL: "pending_approval",
   ACTIVE: "active",
   EXPIRED: "expired",
   REJECTED: "rejected",
@@ -31,6 +32,13 @@ export const adPlacements = {
   HOMEPAGE_LATEST: "homepage-latest",
   HOMEPAGE_DISTRICT: "homepage-district",
 };
+
+export const adDurationPlans = [
+  { days: 3, amount: 499, label: "3 Days Launch" },
+  { days: 7, amount: 999, label: "7 Days Spotlight" },
+  { days: 15, amount: 1799, label: "15 Days Prime Reach" },
+  { days: 30, amount: 2999, label: "30 Days Home Page Presence" },
+];
 
 export const jharkhandDistricts = [
   "Bokaro",

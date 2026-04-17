@@ -37,9 +37,9 @@ const groupAdsByPlacement = (ads) =>
 
 const AdCard = ({ ad, compact = false }) => (
   <a
-    href={ad.targetUrl}
-    target="_blank"
-    rel="noreferrer"
+    href={ad.targetUrl || undefined}
+    target={ad.targetUrl ? "_blank" : undefined}
+    rel={ad.targetUrl ? "noreferrer" : undefined}
     className={`ad-card group block overflow-hidden rounded-3xl border border-orange-400/20 bg-gradient-to-br from-orange-500/10 via-slate-900 to-slate-950 ${compact ? "h-full" : ""}`}
   >
     {ad.imageUrl ? (
@@ -56,7 +56,7 @@ const AdCard = ({ ad, compact = false }) => (
       </div>
       <h3 className="ad-card-title text-lg font-semibold text-white">{ad.title}</h3>
       {ad.description ? <p className="ad-card-description text-sm leading-6 text-slate-300">{ad.description}</p> : null}
-      <span className="ad-card-cta inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900">{ad.ctaLabel || "Visit Sponsor"}</span>
+      <span className="ad-card-cta inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900">{ad.targetUrl ? ad.ctaLabel || "Visit Sponsor" : "Banner Only"}</span>
     </div>
   </a>
 );
@@ -256,7 +256,15 @@ export const HomePage = () => {
 
       <section className="grid gap-6 lg:grid-cols-[1.8fr_1fr]">
         <div className="panel overflow-hidden p-8">
-          <p className="text-sm uppercase tracking-[0.3em] text-orange-300">Breaking Focus</p>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm uppercase tracking-[0.3em] text-orange-300">Breaking Focus</p>
+            <Link
+              to="/advertise-with-us"
+              className="inline-flex rounded-full border border-orange-300/35 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-100 transition hover:border-orange-300/60 hover:bg-orange-500/20"
+            >
+              Advertise With Us
+            </Link>
+          </div>
           {featured ? (
             <div className="mt-4 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div>
