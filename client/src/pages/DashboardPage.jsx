@@ -339,9 +339,13 @@ export const DashboardPage = () => {
     () => adPlacements.find((placement) => placement.value === adForm.placement),
     [adForm.placement]
   );
-  const pendingAdRequestsCount = useMemo(
-    () => ads.filter((ad) => ad.status === "pending_approval").length,
+  const reviewableAds = useMemo(
+    () => ads.filter((ad) => ad.paymentStatus === "paid"),
     [ads]
+  );
+  const pendingAdRequestsCount = useMemo(
+    () => reviewableAds.filter((ad) => ad.status === "pending_approval").length,
+    [reviewableAds]
   );
 
   const canAccessNewsDesk = user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified);
@@ -1913,7 +1917,7 @@ export const DashboardPage = () => {
                 </div>
 
                 <div className="mt-6 space-y-4">
-                  {ads.map((ad) => (
+                  {reviewableAds.map((ad) => (
                     <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
                       {ad.imageUrl ? (
                         <div className="overflow-hidden rounded-2xl">
@@ -1968,7 +1972,7 @@ export const DashboardPage = () => {
                       </div>
                     </div>
                   ))}
-                  {!ads.length ? <p className="text-slate-500">No advertisement requests are available yet.</p> : null}
+                  {!reviewableAds.length ? <p className="text-slate-500">No successful paid advertisement requests are available yet.</p> : null}
                 </div>
               </div>
             </div>
