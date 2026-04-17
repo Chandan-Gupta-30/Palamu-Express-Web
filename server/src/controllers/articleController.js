@@ -22,6 +22,10 @@ const canSubmitArticle = (user) =>
   (user?.role === roles.SUPER_ADMIN || hasVerifiedEditorialAccess(user)) && hasFunctionalAccess(user);
 const canPublishDirectly = (user) =>
   [roles.CHIEF_EDITOR, roles.SUPER_ADMIN].includes(user?.role) && hasFunctionalAccess(user);
+const getDisabledAccessMessage = (user) =>
+  user?.role === roles.CHIEF_EDITOR
+    ? "Your editorial actions are currently disabled by the super admin."
+    : "Your newsroom actions are currently disabled by the super admin.";
 
 const getDayRange = (dateValue) => {
   const normalized = new Date(`${dateValue}T00:00:00.000Z`);
@@ -169,7 +173,7 @@ export const updateArticle = asyncHandler(async (req, res) => {
 
 export const deleteArticle = asyncHandler(async (req, res) => {
   if (!hasFunctionalAccess(req.user)) {
-    return res.status(StatusCodes.FORBIDDEN).json({ message: "Your newsroom actions are currently disabled by the super admin." });
+    return res.status(StatusCodes.FORBIDDEN).json({ message: getDisabledAccessMessage(req.user) });
   }
 
   const canDeletePublishedArticles = canReviewArticles(req.user);
@@ -480,6 +484,10 @@ export const generateVoiceArticleDraft = asyncHandler(async (req, res) => {
 });
 
 export const getWorkflowArticles = asyncHandler(async (req, res) => {
+  if (!hasFunctionalAccess(req.user)) {
+    return res.status(StatusCodes.FORBIDDEN).json({ message: getDisabledAccessMessage(req.user) });
+  }
+
   const statusFilter = req.query.status || "all";
   const mineOnly = req.query.mine === "true";
   const query = {};
@@ -500,6 +508,10 @@ export const getWorkflowArticles = asyncHandler(async (req, res) => {
 });
 
 export const getPublishedArticlesByDate = asyncHandler(async (req, res) => {
+  if (!hasFunctionalAccess(req.user)) {
+    return res.status(StatusCodes.FORBIDDEN).json({ message: getDisabledAccessMessage(req.user) });
+  }
+
   const selectedDate = String(req.query.date || "").trim();
 
   if (!selectedDate) {
@@ -518,6 +530,10 @@ export const getPublishedArticlesByDate = asyncHandler(async (req, res) => {
 });
 
 export const deletePublishedArticlesByDate = asyncHandler(async (req, res) => {
+  if (!hasFunctionalAccess(req.user)) {
+    return res.status(StatusCodes.FORBIDDEN).json({ message: getDisabledAccessMessage(req.user) });
+  }
+
   const selectedDate = String(req.query.date || "").trim();
 
   if (!selectedDate) {

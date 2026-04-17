@@ -209,7 +209,16 @@ export const updateUserByAdmin = asyncHandler(async (req, res) => {
   }
 
   await user.save();
-  res.json({ message: "User updated", user: await User.findById(user._id).select("-password") });
+  const sanitizedUser = await User.findById(user._id).select("-password");
+
+  req.io?.to(`user:${user._id}`).emit("user:access-updated", {
+    userId: String(user._id),
+    isFunctionalityDisabled: Boolean(sanitizedUser?.isFunctionalityDisabled),
+    approvalStatus: sanitizedUser?.approvalStatus,
+    isPhoneVerified: Boolean(sanitizedUser?.isPhoneVerified),
+  });
+
+  res.json({ message: "User updated", user: sanitizedUser });
 });
 
 export const deleteUserByAdmin = asyncHandler(async (req, res) => {

@@ -5,7 +5,18 @@ import { ContactMessage } from "../models/ContactMessage.js";
 import { User } from "../models/User.js";
 import { approvalStatuses, articleStatuses, roles } from "../utils/constants.js";
 
+const ensureActiveEditorialAccess = (user, res) => {
+  if (user?.role !== roles.SUPER_ADMIN && user?.isFunctionalityDisabled) {
+    res.status(403).json({ message: "Your editorial actions are currently disabled by the super admin." });
+    return false;
+  }
+
+  return true;
+};
+
 export const getDashboardOverview = asyncHandler(async (req, res) => {
+  if (!ensureActiveEditorialAccess(req.user, res)) return;
+
   const [users, pendingUsers, pendingArticles, publishedArticles, activeAds, contactMessages, newContactMessages] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ approvalStatus: approvalStatuses.PENDING }),
@@ -22,6 +33,8 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 });
 
 export const getPendingApprovals = asyncHandler(async (req, res) => {
+  if (!ensureActiveEditorialAccess(req.user, res)) return;
+
   const [pendingUsers, pendingArticles] = await Promise.all([
     User.find({
       approvalStatus: approvalStatuses.PENDING,
