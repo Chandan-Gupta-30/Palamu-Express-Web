@@ -10,6 +10,45 @@ const placementLabels = {
   "homepage-district": "District Coverage Sponsor Strip",
 };
 
+const defaultPlacementPricing = {
+  "homepage-district": {
+    baseDailyRate: 299,
+    label: "District Coverage Sponsor Strip",
+    shortLabel: "District Sponsor Rail Strip",
+    durationPlans: [
+      { days: 1, amount: 299, label: "1 Day" },
+      { days: 3, amount: 897, label: "3 Days" },
+      { days: 7, amount: 2093, label: "7 Days" },
+      { days: 15, amount: 4485, label: "15 Days" },
+      { days: 30, amount: 8970, label: "30 Days" },
+    ],
+  },
+  "homepage-latest": {
+    baseDailyRate: 499,
+    label: "Latest Updates Sponsor Grid",
+    shortLabel: "Latest Update Sponsor Section",
+    durationPlans: [
+      { days: 1, amount: 499, label: "1 Day" },
+      { days: 3, amount: 1497, label: "3 Days" },
+      { days: 7, amount: 3493, label: "7 Days" },
+      { days: 15, amount: 7485, label: "15 Days" },
+      { days: 30, amount: 14970, label: "30 Days" },
+    ],
+  },
+  "homepage-hero": {
+    baseDailyRate: 699,
+    label: "Homepage Hero Rail",
+    shortLabel: "Homepage Hero Rail",
+    durationPlans: [
+      { days: 1, amount: 699, label: "1 Day" },
+      { days: 3, amount: 2097, label: "3 Days" },
+      { days: 7, amount: 4893, label: "7 Days" },
+      { days: 15, amount: 10485, label: "15 Days" },
+      { days: 30, amount: 20970, label: "30 Days" },
+    ],
+  },
+};
+
 const initialForm = {
   advertiserName: "",
   advertiserEmail: "",
@@ -52,6 +91,15 @@ const getBannerPreviewUrl = (value) => String(value || "").trim();
 const PALAMU_EXPRESS_CHECKOUT_LOGO =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='48' fill='%23f97316'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-size='108' font-weight='700' fill='white'%3EPE%3C/text%3E%3C/svg%3E";
 
+const normalizePlacementPricing = (payload = {}) => {
+  const incomingPricing = payload.placementPricing;
+  if (incomingPricing && Object.keys(incomingPricing).length) {
+    return incomingPricing;
+  }
+
+  return defaultPlacementPricing;
+};
+
 export const AdvertisePage = () => {
   const [form, setForm] = useState(initialForm);
   const [placementPricing, setPlacementPricing] = useState({});
@@ -65,7 +113,7 @@ export const AdvertisePage = () => {
     http
       .get("/ads/form-options")
       .then(({ data }) => {
-        const pricing = data.placementPricing || {};
+        const pricing = normalizePlacementPricing(data);
         setPlacementPricing(pricing);
         setRazorpayKeyId(data.razorpayKeyId || "");
         const defaultPlacement = pricing[initialForm.placement] ? initialForm.placement : Object.keys(pricing)[0] || initialForm.placement;
@@ -77,10 +125,17 @@ export const AdvertisePage = () => {
         }));
       })
       .catch(() => {
+        const pricing = defaultPlacementPricing;
+        setPlacementPricing(pricing);
+        setForm((current) => ({
+          ...current,
+          placement: pricing[initialForm.placement] ? initialForm.placement : Object.keys(pricing)[0] || initialForm.placement,
+          durationDays: pricing[initialForm.placement]?.durationPlans?.[0]?.days || 1,
+        }));
         setPopup({
           type: "error",
           title: "Unable to load plans",
-          message: "We could not load the advertisement pricing plans right now. Please try again shortly.",
+          message: "Live pricing could not be loaded from the server, so default placement rates are being shown for now.",
         });
       })
       .finally(() => setLoadingOptions(false));
@@ -507,7 +562,14 @@ export const AdvertisePage = () => {
             <h2 className="mt-3 text-2xl font-semibold text-white">{form.title || "Your campaign preview"}</h2>
             {bannerPreviewUrl ? (
               <div className="mt-5 flex h-56 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-                <img src={bannerPreviewUrl} alt={form.title || "Campaign banner preview"} className="h-full w-full object-contain" />
+                <img
+                  src={bannerPreviewUrl}
+                  alt={form.title || "Campaign banner preview"}
+                  className="h-full w-full object-contain"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
             ) : (
               <div className="mt-5 flex h-56 items-center justify-center rounded-2xl border border-dashed border-white/15 text-sm text-slate-400">
