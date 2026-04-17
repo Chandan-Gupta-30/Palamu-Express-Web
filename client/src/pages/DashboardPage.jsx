@@ -9,6 +9,7 @@ import { ActionPopup } from "../components/ui/ActionPopup";
 import { useAuth } from "../context/AuthContext";
 import { http } from "../api/http";
 import { jharkhandBlocksByDistrict, jharkhandDistricts } from "../data/districts";
+import { getArticleAuthorName, getArticlePageUrl, getArticlePublishedLabel } from "../utils/articles";
 
 const adPlacements = [
   { value: "homepage-hero", label: "Homepage Hero Rail", hint: "Shows near the top of the homepage beside the lead story." },
@@ -50,6 +51,10 @@ const initialArticleForm = {
   area: "",
   breaking: false,
   coverImageUrl: "",
+  audioUrl: "",
+  audioDuration: 0,
+  audioWaveform: [],
+  audioTranscript: "",
 };
 
 const initialAdForm = {
@@ -79,6 +84,7 @@ const initialManagedUserForm = {
   role: "reporter",
   approvalStatus: "pending",
   isPhoneVerified: false,
+  isFunctionalityDisabled: false,
   profilePhotoUrl: "",
   aadhaarImageUrl: "",
   livePhotoUrl: "",
@@ -119,6 +125,7 @@ const formatDateTime = (value) => {
 };
 
 const getAdvertisementActivityDate = (ad) => ad.paidAt || ad.reviewedAt || ad.startsAt || ad.createdAt || "";
+const getArticleViews = (article) => Number(article?.pageViews || 0).toLocaleString("en-IN");
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
@@ -163,6 +170,8 @@ const ConfirmActionModal = ({
   onConfirm,
   onCancel,
   busy = false,
+  cancelLabel = "Cancel",
+  kicker = "Confirm Action",
 }) => {
   if (!open) return null;
 
@@ -171,7 +180,7 @@ const ConfirmActionModal = ({
       <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-slate-950/95 p-6 shadow-[0_32px_80px_rgba(15,23,42,0.45)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-300">Confirm Action</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-300">{kicker}</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">{title}</h2>
           </div>
           <button
@@ -194,7 +203,7 @@ const ConfirmActionModal = ({
             disabled={busy}
             className="rounded-full border border-white/10 px-5 py-2.5 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Keep Articles
+            {cancelLabel}
           </button>
           <button
             type="button"
@@ -217,6 +226,9 @@ const PublishedArchiveSection = ({
   onRefresh,
   onDelete,
   busy,
+  onEditArticle,
+  onDeleteArticle,
+  onCopyLink,
 }) => (
   <div className="panel p-6">
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -278,7 +290,8 @@ const PublishedArchiveSection = ({
               <p className="text-sm text-slate-500">
                 By {article.author?.fullName || "Unknown"} • {article.district || "-"} • {article.area || "-"}
               </p>
-              <p className="text-sm text-slate-500">Published on {formatDate(article.publishedAt)}</p>
+              <p className="text-sm text-slate-500">Published: {getArticlePublishedLabel(article)}</p>
+              <p className="text-sm text-slate-500">Views: {getArticleViews(article)}</p>
             </div>
             <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">
               {article.status}
@@ -290,6 +303,17 @@ const PublishedArchiveSection = ({
             </div>
           ) : null}
           {article.excerpt ? <p className="mt-4 text-sm leading-6 text-slate-400">{article.excerpt}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="button" onClick={() => onEditArticle(article)} className="dashboard-outline-button rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
+              Edit
+            </button>
+            <button type="button" onClick={() => onDeleteArticle(article)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+              Delete
+            </button>
+            <button type="button" onClick={() => onCopyLink(article)} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
+              Copy Link
+            </button>
+          </div>
         </div>
       ))}
       {!articles.length ? (
@@ -331,6 +355,8 @@ export const DashboardPage = () => {
   const [publishedArchiveArticles, setPublishedArchiveArticles] = useState([]);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [showArchiveDeleteModal, setShowArchiveDeleteModal] = useState(false);
+  const [pendingAdDelete, setPendingAdDelete] = useState(null);
+  const [pendingArchiveArticleDelete, setPendingArchiveArticleDelete] = useState(null);
   const [busyAction, setBusyAction] = useState("");
   const [managedUserForm, setManagedUserForm] = useState(initialManagedUserForm);
   const [credentialForm, setCredentialForm] = useState(initialCredentialForm);
@@ -381,8 +407,9 @@ export const DashboardPage = () => {
     [ads, adDateFilter, adSearch, adStatusFilter]
   );
 
-  const canAccessNewsDesk = user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified);
-  const canAccessVoiceDesk = user?.role === "super_admin" || canAccessNewsDesk;
+  const isFunctionalityDisabled = Boolean(profile?.isFunctionalityDisabled);
+  const canAccessNewsDesk = (user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified)) && !isFunctionalityDisabled;
+  const canAccessVoiceDesk = (user?.role === "super_admin" || canAccessNewsDesk) && !isFunctionalityDisabled;
   const showDashboardActions = user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin";
   const showReporterCardAction = (user?.role === "reporter" || user?.role === "chief_editor") && reporterCardUrl;
   const uniqueMyArticles = useMemo(() => dedupeArticlesById(myArticles), [myArticles]);
@@ -698,6 +725,10 @@ export const DashboardPage = () => {
       area: article.area,
       breaking: article.breaking,
       coverImageUrl: article.coverImageUrl || "",
+      audioUrl: article.audioUrl || "",
+      audioDuration: article.audioDuration || 0,
+      audioWaveform: article.audioWaveform || [],
+      audioTranscript: article.audioTranscript || "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -708,6 +739,43 @@ export const DashboardPage = () => {
       await http.delete(`/articles/${articleId}`);
       refreshMyArticles();
     }, "Article deleted.");
+  };
+
+  const copyArticleLink = async (article) => {
+    const articleUrl = getArticlePageUrl(article.slug);
+
+    try {
+      await navigator.clipboard.writeText(articleUrl);
+      setActionPopup({
+        type: "success",
+        title: "Link copied",
+        message: "The article link has been copied to your clipboard.",
+      });
+    } catch (_) {
+      setActionPopup({
+        type: "error",
+        title: "Copy failed",
+        message: "We could not copy the article link right now.",
+      });
+    }
+  };
+
+  const deleteArchiveArticle = async (articleId) => {
+    await handleAction(async () => {
+      await http.delete(`/articles/${articleId}`);
+      if (editingArticleId === articleId) {
+        resetArticleForm();
+      }
+      refreshMyArticles();
+      refreshPublishedArchive();
+      if (user?.role === "super_admin") {
+        refreshAdminData();
+      }
+      if (user?.role === "chief_editor") {
+        refreshEditorialQueue();
+        refreshChiefMetrics();
+      }
+    }, "Published article deleted.");
   };
 
   const submitAd = async (event) => {
@@ -768,7 +836,6 @@ export const DashboardPage = () => {
   };
 
   const deleteAd = async (adId) => {
-    if (!window.confirm("Delete this advertisement? This cannot be undone.")) return;
     await handleAction(async () => {
       await http.delete(`/ads/${adId}`);
       if (editingAdId === adId) {
@@ -805,6 +872,7 @@ export const DashboardPage = () => {
       role: managedUser.role || "reporter",
       approvalStatus: managedUser.approvalStatus || "pending",
       isPhoneVerified: Boolean(managedUser.isPhoneVerified),
+      isFunctionalityDisabled: Boolean(managedUser.isFunctionalityDisabled),
       profilePhotoUrl: managedUser.profilePhotoUrl || "",
       aadhaarImageUrl: managedUser.aadhaarImageUrl || "",
       livePhotoUrl: managedUser.livePhotoUrl || "",
@@ -1107,12 +1175,53 @@ export const DashboardPage = () => {
         description={`This will permanently remove all homepage articles published on ${publishedArchiveDate}. This action cannot be undone.`}
         confirmLabel="Delete All Articles"
         busy={archiveBusy}
+        cancelLabel="Keep Articles"
         onCancel={() => {
           if (!archiveBusy) {
             setShowArchiveDeleteModal(false);
           }
         }}
         onConfirm={confirmPublishedArchiveDelete}
+      />
+      <ConfirmActionModal
+        open={Boolean(pendingAdDelete)}
+        title="Delete advertisement"
+        description={`This will permanently delete "${pendingAdDelete?.title || "this advertisement"}". This action cannot be undone.`}
+        confirmLabel="Delete Advertisement"
+        cancelLabel="Keep Advertisement"
+        kicker="Delete Advertisement"
+        busy={busyAction === "Advertisement deleted."}
+        onCancel={() => {
+          if (busyAction !== "Advertisement deleted.") {
+            setPendingAdDelete(null);
+          }
+        }}
+        onConfirm={async () => {
+          if (!pendingAdDelete?._id) return;
+          const targetId = pendingAdDelete._id;
+          setPendingAdDelete(null);
+          await deleteAd(targetId);
+        }}
+      />
+      <ConfirmActionModal
+        open={Boolean(pendingArchiveArticleDelete)}
+        title="Delete published article"
+        description={`This will permanently delete "${pendingArchiveArticleDelete?.title || "this article"}" from the archive. This action cannot be undone.`}
+        confirmLabel="Delete Article"
+        cancelLabel="Keep Article"
+        kicker="Delete Article"
+        busy={busyAction === "Published article deleted."}
+        onCancel={() => {
+          if (busyAction !== "Published article deleted.") {
+            setPendingArchiveArticleDelete(null);
+          }
+        }}
+        onConfirm={async () => {
+          if (!pendingArchiveArticleDelete?._id) return;
+          const targetId = pendingArchiveArticleDelete._id;
+          setPendingArchiveArticleDelete(null);
+          await deleteArchiveArticle(targetId);
+        }}
       />
       <VoiceNewsComposer
         open={showVoiceDesk}
@@ -1234,13 +1343,13 @@ export const DashboardPage = () => {
               </>
             ) : user?.role === "chief_editor" ? (
               <>
-                <p>Your chief editor desk opens after approval and phone verification. You can submit stories, track your own articles, and review pending reporter news.</p>
+                <p>Your chief editor desk opens after approval, phone verification, and active newsroom access. Super admin can temporarily disable these actions when needed.</p>
                 <p>Use the editorial queue to publish strong reports quickly or send revision feedback back to the reporter desk.</p>
                 <p>Your dashboard also shows live newsroom metrics so you can monitor pending and published coverage.</p>
               </>
             ) : (
               <>
-                <p>Your reporter desk opens after approval and phone verification. Once unlocked, every submission goes to the super admin publishing queue.</p>
+                <p>Your reporter desk opens after approval, phone verification, and active newsroom access. Super admin can temporarily disable these actions when needed.</p>
                 <p>Use the excerpt field for a concise summary and the full content field for the complete report copy.</p>
                 <p>Approved reporters also receive a generated reporter ID card link directly inside this dashboard.</p>
               </>
@@ -1391,7 +1500,11 @@ export const DashboardPage = () => {
               </div>
 
               {!canAccessNewsDesk ? (
-                <p className="mt-4 text-slate-500">Your news desk unlocks after super admin approval and phone verification.</p>
+                <p className="mt-4 text-slate-500">
+                  {isFunctionalityDisabled
+                    ? "Your newsroom actions are currently disabled by the super admin. Article publishing and review tools are temporarily unavailable."
+                    : "Your news desk unlocks after super admin approval and phone verification."}
+                </p>
               ) : (
                 <form onSubmit={submitArticle} className="mt-5 grid gap-4 md:grid-cols-2">
                   <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white md:col-span-2" placeholder="Headline" value={articleForm.title} onChange={(event) => setArticleForm({ ...articleForm, title: event.target.value })} />
@@ -1452,6 +1565,9 @@ export const DashboardPage = () => {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-lg font-semibold text-white">{article.title}</p>
+                      <p className="text-sm text-slate-500">By {getArticleAuthorName(article)}</p>
+                      <p className="text-sm text-slate-500">Published: {getArticlePublishedLabel(article)}</p>
+                      <p className="text-sm text-slate-500">Views: {getArticleViews(article)}</p>
                       <p className="text-sm text-slate-500">{article.district} Ã¢â‚¬Â¢ {article.area} Ã¢â‚¬Â¢ {article.status}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1468,6 +1584,11 @@ export const DashboardPage = () => {
                     </div>
                   ) : null}
                   {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button type="button" onClick={() => copyArticleLink(article)} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
+                      Copy Link
+                    </button>
+                  </div>
                   {article.status !== "published" ? (
                     <div className="mt-4 flex gap-3">
                       {!article.audioUrl ? (
@@ -1510,6 +1631,9 @@ export const DashboardPage = () => {
                 onRefresh={() => refreshPublishedArchive()}
                 onDelete={requestPublishedArchiveDelete}
                 busy={archiveBusy}
+                onEditArticle={startEditArticle}
+                onDeleteArticle={(article) => setPendingArchiveArticleDelete(article)}
+                onCopyLink={copyArticleLink}
               />
 
             <div className="panel p-6">
@@ -1559,6 +1683,9 @@ export const DashboardPage = () => {
             onRefresh={() => refreshPublishedArchive()}
             onDelete={requestPublishedArchiveDelete}
             busy={archiveBusy}
+            onEditArticle={startEditArticle}
+            onDeleteArticle={(article) => setPendingArchiveArticleDelete(article)}
+            onCopyLink={copyArticleLink}
           />
 
           <div className="panel p-6">
@@ -1681,6 +1808,14 @@ export const DashboardPage = () => {
                         <input type="checkbox" checked={managedUserForm.isPhoneVerified} onChange={(event) => setManagedUserForm({ ...managedUserForm, isPhoneVerified: event.target.checked })} />
                         Phone verified
                       </label>
+                      <label className="flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-400">
+                        <input
+                          type="checkbox"
+                          checked={managedUserForm.isFunctionalityDisabled}
+                          onChange={(event) => setManagedUserForm({ ...managedUserForm, isFunctionalityDisabled: event.target.checked })}
+                        />
+                        Disable all newsroom actions
+                      </label>
                       <div className="flex gap-3 md:col-span-2">
                         <button type="button" onClick={() => saveManagedUser(managedUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
                         <button type="button" onClick={() => deleteManagedUser(managedUser._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
@@ -1706,6 +1841,13 @@ export const DashboardPage = () => {
                             {managedUser.approvalStatus}
                           </span>
                           <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">{managedUser.isPhoneVerified ? "Phone Verified" : "Phone Pending"}</span>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                              managedUser.isFunctionalityDisabled ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300"
+                            }`}
+                          >
+                            {managedUser.isFunctionalityDisabled ? "Actions Disabled" : "Actions Enabled"}
+                          </span>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -2017,7 +2159,7 @@ export const DashboardPage = () => {
                         <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
                           Edit
                         </button>
-                        <button type="button" onClick={() => deleteAd(ad._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+                        <button type="button" onClick={() => setPendingAdDelete(ad)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
                           Delete
                         </button>
                         {ad.status === "pending_approval" ? (
@@ -2110,7 +2252,7 @@ export const DashboardPage = () => {
                         <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
                           Edit
                         </button>
-                        <button type="button" onClick={() => deleteAd(ad._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+                        <button type="button" onClick={() => setPendingAdDelete(ad)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
                           Delete
                         </button>
                       </div>

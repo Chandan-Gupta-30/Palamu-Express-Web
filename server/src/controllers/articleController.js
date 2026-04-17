@@ -14,13 +14,14 @@ const slugify = (value) =>
     .replace(/(^-|-$)/g, "");
 
 const canManageOwnArticles = (user) => [roles.REPORTER, roles.CHIEF_EDITOR, roles.SUPER_ADMIN].includes(user?.role);
-const canReviewArticles = (user) => [roles.SUPER_ADMIN, roles.CHIEF_EDITOR].includes(user?.role);
+const hasFunctionalAccess = (user) => !user?.isFunctionalityDisabled;
+const canReviewArticles = (user) => [roles.SUPER_ADMIN, roles.CHIEF_EDITOR].includes(user?.role) && hasFunctionalAccess(user);
 const hasVerifiedEditorialAccess = (user) =>
   user?.approvalStatus === approvalStatuses.APPROVED && user?.isPhoneVerified;
 const canSubmitArticle = (user) =>
-  user?.role === roles.SUPER_ADMIN || hasVerifiedEditorialAccess(user);
+  (user?.role === roles.SUPER_ADMIN || hasVerifiedEditorialAccess(user)) && hasFunctionalAccess(user);
 const canPublishDirectly = (user) =>
-  [roles.CHIEF_EDITOR, roles.SUPER_ADMIN].includes(user?.role);
+  [roles.CHIEF_EDITOR, roles.SUPER_ADMIN].includes(user?.role) && hasFunctionalAccess(user);
 
 const getDayRange = (dateValue) => {
   const normalized = new Date(`${dateValue}T00:00:00.000Z`);
@@ -139,9 +140,13 @@ export const updateArticle = asyncHandler(async (req, res) => {
   }
 
   const aiSummary = await summarizeArticle(payload);
+  const query =
+    isPrivilegedPublisher && canReviewArticles(req.user)
+      ? { _id: req.params.id }
+      : { _id: req.params.id, author: req.user._id };
 
   const article = await Article.findOneAndUpdate(
-    { _id: req.params.id, author: req.user._id },
+    query,
     {
       ...payload,
       ...(aiSummary ? { aiSummary } : {}),
@@ -153,19 +158,33 @@ export const updateArticle = asyncHandler(async (req, res) => {
     { new: true }
   );
 
+  if (!article) {
+    return res.status(StatusCodes.NOT_FOUND).json({
+      message: isPrivilegedPublisher ? "Article not found" : "You can update only your own articles",
+    });
+  }
+
   res.json({ article });
 });
 
 export const deleteArticle = asyncHandler(async (req, res) => {
-  const article = await Article.findOneAndDelete({
-    _id: req.params.id,
-    author: req.user._id,
-    status: { $ne: articleStatuses.PUBLISHED },
-  });
+  if (!hasFunctionalAccess(req.user)) {
+    return res.status(StatusCodes.FORBIDDEN).json({ message: "Your newsroom actions are currently disabled by the super admin." });
+  }
+
+  const canDeleteAnyArticle = canReviewArticles(req.user);
+  const deleteQuery = canDeleteAnyArticle
+    ? { _id: req.params.id }
+    : {
+        _id: req.params.id,
+        author: req.user._id,
+        status: { $ne: articleStatuses.PUBLISHED },
+      };
+  const article = await Article.findOneAndDelete(deleteQuery);
 
   if (!article) {
     return res.status(StatusCodes.NOT_FOUND).json({
-      message: "Only your non-published articles can be deleted",
+      message: canDeleteAnyArticle ? "Article not found" : "Only your non-published articles can be deleted",
     });
   }
 

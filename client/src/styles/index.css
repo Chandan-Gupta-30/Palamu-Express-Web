@@ -65,6 +65,12 @@ html.light .bg-white\/5 {
   background-color: rgba(255, 255, 255, 0.9) !important;
 }
 
+html.light .bg-white\/10,
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\] {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+
 html.light .border-white\/10,
 html.light .border-white\/15 {
   border-color: rgba(15, 23, 42, 0.08) !important;
@@ -79,6 +85,32 @@ html.light .text-rose-300 {
   color: #be123c !important;
 }
 
+html.light .text-orange-100,
+html.light .text-amber-100,
+html.light .text-amber-200,
+html.light .text-emerald-200,
+html.light .text-emerald-300,
+html.light .text-green-500 {
+  color: inherit;
+}
+
+html.light .text-emerald-300 {
+  color: #047857 !important;
+}
+
+html.light .text-emerald-200 {
+  color: #065f46 !important;
+}
+
+html.light .text-amber-100,
+html.light .text-amber-200 {
+  color: #92400e !important;
+}
+
+html.light .text-orange-100 {
+  color: #ffffff !important;
+}
+
 html.light .text-white {
   color: #0f172a !important;
 }
@@ -86,12 +118,20 @@ html.light .text-white {
 html.light input,
 html.light textarea,
 html.light select {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
   color: #0f172a !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 html.light input::placeholder,
 html.light textarea::placeholder {
   color: #64748b !important;
+}
+
+html.light select option {
+  background-color: #ffffff;
+  color: #0f172a;
 }
 
 html.light header,
@@ -147,6 +187,50 @@ html.light .ad-empty-title {
 
 html.light .ad-empty-description {
   color: #475569 !important;
+}
+
+.whatsapp-share-button {
+  color: #10b981;
+}
+
+html.light .whatsapp-share-button {
+  background-color: #16a34a !important;
+  border-color: rgba(22, 163, 74, 0.25) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 30px rgba(22, 163, 74, 0.18);
+}
+
+.gemini-badge,
+.gemini-trigger {
+  color: #fef3c7;
+}
+
+html.light .gemini-badge {
+  border-color: rgba(249, 115, 22, 0.24) !important;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(249, 115, 22, 0.14)) !important;
+  color: #9a3412 !important;
+}
+
+html.light .gemini-trigger {
+  border-color: rgba(249, 115, 22, 0.28) !important;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.26), rgba(249, 115, 22, 0.18), rgba(255, 255, 255, 0.96)) !important;
+  color: #9a3412 !important;
+  box-shadow: 0 12px 30px rgba(249, 115, 22, 0.16);
+}
+
+html.light .dashboard-copy-button,
+html.light .dashboard-outline-button {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
+}
+
+html.light .dashboard-muted-text {
+  color: #475569 !important;
+}
+
+html.light .dashboard-strong-text {
+  color: #0f172a !important;
 }
 
 .ticker-track {

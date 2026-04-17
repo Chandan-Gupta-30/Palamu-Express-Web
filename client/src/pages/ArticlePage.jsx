@@ -173,7 +173,7 @@ export const ArticlePage = () => {
           <h2 className="text-xl font-semibold text-white">AI Summary</h2>
           <div className="flex items-center gap-3">
             {summaryLocked ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">
+              <span className="gemini-badge inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">
                 <GeminiIcon className="h-3.5 w-3.5" />
                 Smart cache active
               </span>
@@ -210,7 +210,7 @@ export const ArticlePage = () => {
                   setSummaryLoading(false);
                 }
               }}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-orange-300/30 bg-[linear-gradient(135deg,rgba(251,191,36,0.22),rgba(249,115,22,0.22),rgba(255,255,255,0.06))] text-orange-100 shadow-[0_12px_30px_rgba(249,115,22,0.22)] transition hover:scale-[1.03] hover:border-orange-200/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="gemini-trigger inline-flex h-11 w-11 items-center justify-center rounded-full border border-orange-300/30 bg-[linear-gradient(135deg,rgba(251,191,36,0.22),rgba(249,115,22,0.22),rgba(255,255,255,0.06))] text-orange-100 shadow-[0_12px_30px_rgba(249,115,22,0.22)] transition hover:scale-[1.03] hover:border-orange-200/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               aria-label={summaryLoading ? "Preparing AI summary" : "Generate AI summary with Gemini"}
               title={summaryLoading ? "Preparing AI summary" : "Generate AI summary with Gemini"}
             >

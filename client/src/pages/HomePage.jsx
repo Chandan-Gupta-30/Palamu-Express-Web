@@ -281,7 +281,7 @@ export const HomePage = () => {
             <p className="text-sm uppercase tracking-[0.3em] text-orange-300">Breaking Focus</p>
             <Link
               to="/advertise-with-us"
-              className="inline-flex rounded-full border border-orange-300/35 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-100 transition hover:border-orange-300/60 hover:bg-orange-500/20"
+              className="inline-flex rounded-full border border-orange-300/35 bg-orange-500/80 px-4 py-2 text-sm font-semibold text-white transition hover:border-orange-300/60 hover:bg-orange-500"
             >
               Advertise With Us
             </Link>
@@ -303,7 +303,7 @@ export const HomePage = () => {
                   <ArticleMeta article={featured} />
                   <WhatsAppShareLink
                     article={featured}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20 hover:text-emerald-200"
+                    className="whatsapp-share-button inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20 hover:text-emerald-200"
                   />
                 </div>
                 {featured.audioUrl ? <AudioStoryPlayer article={featured} compact className="mt-6 max-w-xl" /> : null}
@@ -350,7 +350,7 @@ export const HomePage = () => {
                     <ArticleMeta article={article} compact />
                     <WhatsAppShareLink
                       article={article}
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
+                      className="whatsapp-share-button inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
                     />
                   </div>
                 </StoryListLink>
@@ -405,7 +405,7 @@ export const HomePage = () => {
                     </span>
                     <WhatsAppShareLink
                       article={article}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20"
+                      className="whatsapp-share-button inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20"
                     />
                   </div>
                 </div>
@@ -519,7 +519,7 @@ export const HomePage = () => {
                     <ArticleMeta article={article} compact />
                     <WhatsAppShareLink
                       article={article}
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
+                      className="whatsapp-share-button inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
                     />
                   </div>
                 </div>
@@ -560,7 +560,7 @@ export const HomePage = () => {
                           <ArticleMeta article={article} compact />
                           <WhatsAppShareLink
                             article={article}
-                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
+                            className="whatsapp-share-button inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/40 hover:bg-emerald-500/20"
                           />
                         </div>
                       </StoryListLink>

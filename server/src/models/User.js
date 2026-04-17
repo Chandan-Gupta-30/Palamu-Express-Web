@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema(
     phoneOtpExpiresAt: { type: Date, select: false },
     bookmarks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Article" }],
     rejectionFeedback: { type: String },
+    isFunctionalityDisabled: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

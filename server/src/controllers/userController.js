@@ -169,6 +169,7 @@ export const updateUserByAdmin = asyncHandler(async (req, res) => {
     "role",
     "approvalStatus",
     "isPhoneVerified",
+    "isFunctionalityDisabled",
   ];
   const update = Object.fromEntries(
     Object.entries(req.body || {}).filter(([key]) => allowedFields.includes(key))

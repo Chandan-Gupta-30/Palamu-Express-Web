@@ -26,7 +26,7 @@ export const ShareBar = ({ url, title, whatsappUrl, onCopy }) => {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-3">
-      <a href={shareLinks.whatsapp} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 px-4 py-2 text-sm">
+      <a href={shareLinks.whatsapp} target="_blank" rel="noreferrer" className="whatsapp-share-button rounded-full border border-white/10 px-4 py-2 text-sm">
         <WhatsAppIcon className="mr-2 inline h-4 w-4" />
         WhatsApp
       </a>
