@@ -126,7 +126,7 @@ const formatDateTime = (value) => {
 
 const getAdvertisementActivityDate = (ad) => ad.paidAt || ad.reviewedAt || ad.startsAt || ad.createdAt || "";
 const getArticleViews = (article) => Number(article?.pageViews || 0).toLocaleString("en-IN");
-const joinMetaParts = (...parts) => parts.filter(Boolean).join(" • ");
+const joinMetaParts = (...parts) => parts.filter(Boolean).join(" | ");
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
@@ -413,6 +413,8 @@ export const DashboardPage = () => {
   const canAccessNewsDesk = (user?.role === "super_admin" || (profile?.approvalStatus === "approved" && profile?.isPhoneVerified)) && !isFunctionalityDisabled;
   const canAccessVoiceDesk = (user?.role === "super_admin" || canAccessNewsDesk) && !isFunctionalityDisabled;
   const showDashboardActions = user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin";
+  const showDisabledDashboardState =
+    isFunctionalityDisabled && (user?.role === "reporter" || user?.role === "chief_editor");
   const showReporterCardAction = (user?.role === "reporter" || user?.role === "chief_editor") && reporterCardUrl;
   const uniqueMyArticles = useMemo(() => dedupeArticlesById(myArticles), [myArticles]);
   const uniquePendingArticles = useMemo(() => dedupeArticlesById(pendingArticles), [pendingArticles]);
@@ -1293,6 +1295,29 @@ export const DashboardPage = () => {
         defaultArea={profile?.area || ""}
         onSubmitted={handleVoiceNewsSubmitted}
       />
+      {showDisabledDashboardState ? (
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <div className="w-full max-w-4xl overflow-hidden rounded-[36px] border border-rose-400/20 bg-[radial-gradient(circle_at_top,rgba(251,113,133,0.2),rgba(15,23,42,0.96)_45%,rgba(2,6,23,0.98))] p-8 text-center shadow-[0_32px_80px_rgba(15,23,42,0.48)] md:p-12">
+            <p className="text-sm font-semibold uppercase tracking-[0.34em] text-rose-300">Access Restricted</p>
+            <h1 className="mt-6 font-display text-5xl font-semibold text-rose-100 md:text-7xl">Account Disabled</h1>
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
+              Your newsroom actions have been disabled by the super admin. Publishing, review, archive, and voice-news tools are temporarily unavailable for this account.
+            </p>
+            <div className="mx-auto mt-8 max-w-2xl rounded-[28px] border border-white/10 bg-white/5 p-6 text-left">
+              <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+                <p><span className="font-semibold text-white">Role:</span> {String(profile?.role || user?.role || "-").replaceAll("_", " ")}</p>
+                <p><span className="font-semibold text-white">Approval:</span> {profile?.approvalStatus || "-"}</p>
+                <p><span className="font-semibold text-white">Phone Verified:</span> {profile?.isPhoneVerified ? "Yes" : "No"}</p>
+                <p><span className="font-semibold text-white">Email:</span> {profile?.email || "-"}</p>
+              </div>
+            </div>
+            <p className="mt-8 text-sm leading-7 text-slate-400">
+              Please contact the super admin if you need your newsroom access restored.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
       {showDashboardActions ? (
         <>
           <div className="fixed bottom-4 left-4 z-[70] flex flex-col gap-3 sm:bottom-6 sm:left-6">
@@ -2340,6 +2365,8 @@ export const DashboardPage = () => {
           ) : null}
         </>
       ) : null}
+        </>
+      )}
     </div>
   );
 };

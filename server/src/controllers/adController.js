@@ -120,6 +120,38 @@ const normalizeAdminAdvertisementInput = async (payload = {}, user) => {
   };
 };
 
+const normalizeAdminAdvertisementUpdateInput = async (payload = {}, user, existingAd) => {
+  const resolvedPayload = {
+    ...payload,
+    title: String(payload.title ?? existingAd?.title ?? "").trim(),
+    imageUrl: String(payload.imageUrl ?? existingAd?.imageUrl ?? "").trim() || String(existingAd?.imageUrl || "").trim(),
+    targetUrl: String(payload.targetUrl ?? existingAd?.targetUrl ?? "").trim(),
+    placement: payload.placement ?? existingAd?.placement,
+    description: String(payload.description ?? existingAd?.description ?? "").trim(),
+    ctaLabel: String(payload.ctaLabel ?? existingAd?.ctaLabel ?? "Visit Sponsor").trim(),
+    durationDays:
+      payload.durationDays === "" || payload.durationDays === undefined || payload.durationDays === null
+        ? Number(existingAd?.durationDays || 0)
+        : payload.durationDays,
+    amount:
+      payload.amount === "" || payload.amount === undefined || payload.amount === null
+        ? Number(existingAd?.amount || 0)
+        : payload.amount,
+    priority:
+      payload.priority === "" || payload.priority === undefined || payload.priority === null
+        ? Number(existingAd?.priority || 100)
+        : payload.priority,
+    advertiserName: String(payload.advertiserName ?? existingAd?.advertiserName ?? user?.fullName ?? "").trim(),
+    advertiserEmail: String(payload.advertiserEmail ?? existingAd?.advertiserEmail ?? user?.email ?? "").trim(),
+    advertiserPhone: String(payload.advertiserPhone ?? existingAd?.advertiserPhone ?? user?.phone ?? "").trim(),
+    companyName: String(payload.companyName ?? existingAd?.companyName ?? "").trim(),
+    notes: String(payload.notes ?? existingAd?.notes ?? "").trim(),
+    status: payload.status ?? existingAd?.status,
+  };
+
+  return normalizeAdminAdvertisementInput(resolvedPayload, user);
+};
+
 const normalizePublicAdvertisementInput = async (payload = {}) => {
   const title = String(payload.title || "").trim();
   const imageUrl = await uploadBase64Asset(String(payload.imageUrl || "").trim(), "palamu-express/ads");
@@ -353,7 +385,7 @@ export const updateAdvertisement = asyncHandler(async (req, res) => {
     throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
   }
 
-  const input = await normalizeAdminAdvertisementInput(req.body, req.user);
+  const input = await normalizeAdminAdvertisementUpdateInput(req.body, req.user, ad);
   const nextStatus = input.activateNow ? adStatuses.ACTIVE : input.requestedStatus || ad.status;
   const schedule = buildAdSchedule(
     nextStatus,

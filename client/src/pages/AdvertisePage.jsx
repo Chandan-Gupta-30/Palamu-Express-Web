@@ -88,6 +88,9 @@ const formatCurrency = (value) =>
 
 const isTestRazorpayKey = (value) => String(value || "").startsWith("rzp_test_");
 const getBannerPreviewUrl = (value) => String(value || "").trim();
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+const normalizePhoneNumber = (value) => String(value || "").replace(/\D/g, "").slice(0, 10);
+const isValidPhoneNumber = (value) => /^\d{10}$/.test(normalizePhoneNumber(value));
 const PALAMU_EXPRESS_CHECKOUT_LOGO =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='48' fill='%23f97316'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-size='108' font-weight='700' fill='white'%3EPE%3C/text%3E%3C/svg%3E";
 
@@ -244,6 +247,10 @@ export const AdvertisePage = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const trimmedName = String(form.advertiserName || "").trim();
+    const trimmedEmail = String(form.advertiserEmail || "").trim().toLowerCase();
+    const trimmedPhone = normalizePhoneNumber(form.advertiserPhone);
+    const trimmedTitle = String(form.title || "").trim();
 
     if (!selectedPlan) {
       setPopup({
@@ -263,6 +270,42 @@ export const AdvertisePage = () => {
       return;
     }
 
+    if (!trimmedName) {
+      setPopup({
+        type: "error",
+        title: "Advertiser name required",
+        message: "Please enter the advertiser or contact person name before continuing.",
+      });
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setPopup({
+        type: "error",
+        title: "Valid email required",
+        message: "Please enter a valid advertiser email address before continuing.",
+      });
+      return;
+    }
+
+    if (!isValidPhoneNumber(trimmedPhone)) {
+      setPopup({
+        type: "error",
+        title: "Valid mobile number required",
+        message: "Please enter a valid 10-digit mobile number before continuing.",
+      });
+      return;
+    }
+
+    if (!trimmedTitle) {
+      setPopup({
+        type: "error",
+        title: "Campaign title required",
+        message: "Please enter your campaign title before continuing.",
+      });
+      return;
+    }
+
     if (!bannerPreviewUrl) {
       setPopup({
         type: "error",
@@ -272,6 +315,13 @@ export const AdvertisePage = () => {
       return;
     }
 
+    setForm((current) => ({
+      ...current,
+      advertiserName: trimmedName,
+      advertiserEmail: trimmedEmail,
+      advertiserPhone: trimmedPhone,
+      title: trimmedTitle,
+    }));
     setCheckoutDraft({
       bannerPreviewUrl,
       placementLabel: placementLabels[form.placement] || form.placement,
@@ -444,14 +494,17 @@ export const AdvertisePage = () => {
               type="email"
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
               placeholder="Advertiser email"
+              autoComplete="email"
               value={form.advertiserEmail}
-              onChange={(event) => setForm({ ...form, advertiserEmail: event.target.value })}
+              onChange={(event) => setForm({ ...form, advertiserEmail: event.target.value.trimStart() })}
             />
             <input
+              inputMode="numeric"
+              maxLength="10"
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-              placeholder="Phone number"
+              placeholder="10-digit mobile number"
               value={form.advertiserPhone}
-              onChange={(event) => setForm({ ...form, advertiserPhone: event.target.value })}
+              onChange={(event) => setForm({ ...form, advertiserPhone: normalizePhoneNumber(event.target.value) })}
             />
             <input
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
