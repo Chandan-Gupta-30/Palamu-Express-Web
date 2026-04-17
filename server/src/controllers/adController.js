@@ -340,6 +340,7 @@ export const getActiveAdvertisements = asyncHandler(async (req, res) => {
 export const getAllAdvertisements = asyncHandler(async (req, res) => {
   const ads = await Advertisement.find()
     .populate("reviewedBy", "fullName")
+    .populate("advertiser", "fullName email phone")
     .sort({ createdAt: -1, priority: 1 });
 
   res.json({ ads: ads.map((ad) => normalizeAdvertisementRecord(ad)) });

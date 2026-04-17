@@ -181,6 +181,12 @@ export const updateUserByAdmin = asyncHandler(async (req, res) => {
   }
 
   Object.assign(user, update);
+  if (Object.prototype.hasOwnProperty.call(update, "isPhoneVerified")) {
+    user.isPhoneVerified = Boolean(update.isPhoneVerified);
+  }
+  if (Object.prototype.hasOwnProperty.call(update, "isFunctionalityDisabled")) {
+    user.isFunctionalityDisabled = Boolean(update.isFunctionalityDisabled);
+  }
 
   if (req.body.profilePhotoUrl) {
     user.profilePhotoUrl = await uploadBase64Asset(req.body.profilePhotoUrl, "palamu-express/profile");

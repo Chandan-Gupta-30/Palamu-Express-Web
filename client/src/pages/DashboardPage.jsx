@@ -126,6 +126,7 @@ const formatDateTime = (value) => {
 
 const getAdvertisementActivityDate = (ad) => ad.paidAt || ad.reviewedAt || ad.startsAt || ad.createdAt || "";
 const getArticleViews = (article) => Number(article?.pageViews || 0).toLocaleString("en-IN");
+const joinMetaParts = (...parts) => parts.filter(Boolean).join(" • ");
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
@@ -357,6 +358,7 @@ export const DashboardPage = () => {
   const [showArchiveDeleteModal, setShowArchiveDeleteModal] = useState(false);
   const [pendingAdDelete, setPendingAdDelete] = useState(null);
   const [pendingArchiveArticleDelete, setPendingArchiveArticleDelete] = useState(null);
+  const [pendingManagedUserDelete, setPendingManagedUserDelete] = useState(null);
   const [busyAction, setBusyAction] = useState("");
   const [managedUserForm, setManagedUserForm] = useState(initialManagedUserForm);
   const [credentialForm, setCredentialForm] = useState(initialCredentialForm);
@@ -396,7 +398,7 @@ export const DashboardPage = () => {
         const activityDateValue = getAdvertisementActivityDate(ad);
         const activityDate = activityDateValue ? new Date(activityDateValue).toISOString().slice(0, 10) : "";
         const matchesDate = !adDateFilter || activityDate === adDateFilter;
-        const matchesSearch = [ad.title, ad.advertiserName, ad.companyName, ad.advertiserEmail, ad.placement, ad.status]
+        const matchesSearch = [ad.title, ad.advertiserName, ad.companyName, ad.advertiserEmail, ad.advertiser?.email, ad.placement, ad.status]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -514,6 +516,18 @@ export const DashboardPage = () => {
       http.get("/ads").then(({ data }) => setAds(data.ads)).catch(() => {}),
       http.get("/contact").then(({ data }) => setContactMessages(data.messages)).catch(() => {}),
     ]);
+  };
+
+  const syncManagedUserState = (updatedUser) => {
+    if (!updatedUser?._id) return;
+
+    setManagedUsers((current) =>
+      current.map((managedUser) => (managedUser._id === updatedUser._id ? updatedUser : managedUser))
+    );
+    setPendingUsers((current) =>
+      current.map((pendingUser) => (pendingUser._id === updatedUser._id ? updatedUser : pendingUser))
+    );
+    setProfile((current) => (current?._id === updatedUser._id ? updatedUser : current));
   };
 
   useEffect(() => {
@@ -897,27 +911,37 @@ export const DashboardPage = () => {
 
   const saveManagedUser = async (userId) => {
     await handleAction(async () => {
-      const { data } = await http.patch(`/users/${userId}`, managedUserForm);
-      setManagedUsers((current) =>
-        current.map((managedUser) => (managedUser._id === userId ? data.user : managedUser))
-      );
+      const payload = {
+        ...managedUserForm,
+        isPhoneVerified: Boolean(managedUserForm.isPhoneVerified),
+        isFunctionalityDisabled: Boolean(managedUserForm.isFunctionalityDisabled),
+      };
+      const { data } = await http.patch(`/users/${userId}`, payload);
+      const updatedUser = {
+        ...data.user,
+        isPhoneVerified: Boolean(data.user?.isPhoneVerified),
+        isFunctionalityDisabled: Boolean(data.user?.isFunctionalityDisabled),
+      };
+
+      syncManagedUserState(updatedUser);
+
       if (profile?._id === userId) {
-        setProfile(data.user);
-        await refreshUser();
+        const refreshedUser = await refreshUser();
+        setProfile(refreshedUser);
       }
+
       resetManagedUserForm();
       await refreshAdminData();
     }, "User updated.");
   };
 
   const deleteManagedUser = async (userId) => {
-    if (!window.confirm("Delete this user account? This cannot be undone.")) return;
     await handleAction(async () => {
       await http.delete(`/users/${userId}`);
       if (editingManagedUserId === userId) {
         resetManagedUserForm();
       }
-      refreshAdminData();
+      await refreshAdminData();
     }, "User deleted.");
   };
 
@@ -1238,6 +1262,26 @@ export const DashboardPage = () => {
           const targetId = pendingArchiveArticleDelete._id;
           setPendingArchiveArticleDelete(null);
           await deleteArchiveArticle(targetId);
+        }}
+      />
+      <ConfirmActionModal
+        open={Boolean(pendingManagedUserDelete)}
+        title="Delete newsroom user"
+        description={`This will permanently delete "${pendingManagedUserDelete?.fullName || "this user"}" and remove their newsroom access. This action cannot be undone.`}
+        confirmLabel="Delete User"
+        cancelLabel="Keep User"
+        kicker="Delete User"
+        busy={busyAction === "User deleted."}
+        onCancel={() => {
+          if (busyAction !== "User deleted.") {
+            setPendingManagedUserDelete(null);
+          }
+        }}
+        onConfirm={async () => {
+          if (!pendingManagedUserDelete?._id) return;
+          const targetId = pendingManagedUserDelete._id;
+          setPendingManagedUserDelete(null);
+          await deleteManagedUser(targetId);
         }}
       />
       <VoiceNewsComposer
@@ -1585,7 +1629,7 @@ export const DashboardPage = () => {
                       <p className="text-sm text-slate-500">By {getArticleAuthorName(article)}</p>
                       <p className="text-sm text-slate-500">Published: {getArticlePublishedLabel(article)}</p>
                       <p className="text-sm text-slate-500">Views: {getArticleViews(article)}</p>
-                      <p className="text-sm text-slate-500">{article.district} Ã¢â‚¬Â¢ {article.area} Ã¢â‚¬Â¢ {article.status}</p>
+                      <p className="text-sm text-slate-500">{joinMetaParts(article.district, article.area, article.status)}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {article.audioUrl ? (
@@ -1668,7 +1712,7 @@ export const DashboardPage = () => {
                         <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
                       </div>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">By {article.author?.fullName} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {article.district} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {article.area}</p>
+                    <p className="mt-1 text-sm text-slate-500">By {joinMetaParts(article.author?.fullName, article.district, article.area)}</p>
                     <p className="mt-3 text-sm text-slate-400">{article.excerpt}</p>
                     {article.coverImageUrl ? (
                       <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
@@ -1714,7 +1758,7 @@ export const DashboardPage = () => {
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="space-y-1">
                       <p className="text-lg font-semibold text-white">{pendingUser.fullName}</p>
-                      <p className="text-sm text-slate-500">{pendingUser.phone} Ã¢â‚¬Â¢ {pendingUser.district} Ã¢â‚¬Â¢ {pendingUser.area}</p>
+                      <p className="text-sm text-slate-500">{joinMetaParts(pendingUser.phone, pendingUser.district, pendingUser.area)}</p>
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => approveUser(pendingUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Approve</button>
@@ -1835,7 +1879,7 @@ export const DashboardPage = () => {
                       </label>
                       <div className="flex gap-3 md:col-span-2">
                         <button type="button" onClick={() => saveManagedUser(managedUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
-                        <button type="button" onClick={() => deleteManagedUser(managedUser._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
+                        <button type="button" onClick={() => setPendingManagedUserDelete(managedUser)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
                       </div>
                     </div>
                   ) : (
@@ -1870,7 +1914,7 @@ export const DashboardPage = () => {
                       <div className="flex gap-2">
                         {managedUser.approvalStatus === "pending" ? <button type="button" onClick={() => approveUser(managedUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Approve</button> : null}
                         <button type="button" onClick={() => startEditManagedUser(managedUser)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">Edit</button>
-                        <button type="button" onClick={() => deleteManagedUser(managedUser._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
+                        <button type="button" onClick={() => setPendingManagedUserDelete(managedUser)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
                       </div>
                     </div>
                   )}
@@ -1992,7 +2036,7 @@ export const DashboardPage = () => {
                       <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
                     </div>
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">By {article.author?.fullName} Ã¢â‚¬Â¢ {article.district} Ã¢â‚¬Â¢ {article.area}</p>
+                  <p className="mt-1 text-sm text-slate-500">By {joinMetaParts(article.author?.fullName, article.district, article.area)}</p>
                   <p className="mt-3 text-sm text-slate-400">{article.excerpt}</p>
                   {article.coverImageUrl ? (
                     <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
@@ -2164,13 +2208,20 @@ export const DashboardPage = () => {
                         <p>Advertiser: {ad.advertiserName || "-"}</p>
                         <p>Company: {ad.companyName || "-"}</p>
                         <p>Email: {ad.advertiserEmail || "-"}</p>
+                        <p>Payer Account Email: {ad.advertiser?.email || ad.advertiserEmail || "-"}</p>
                         <p>Phone: {ad.advertiserPhone || "-"}</p>
                         <p>Priority: {ad.priority}</p>
                         <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
                         <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
                         <p>Activity Date: {formatDate(getAdvertisementActivityDate(ad))}</p>
+                        <p>Created At: {formatDateTime(ad.createdAt)}</p>
                         <p>Paid At: {formatDateTime(ad.paidAt)}</p>
+                        <p>Reviewed At: {formatDateTime(ad.reviewedAt)}</p>
+                        <p>Reviewed By: {ad.reviewedBy?.fullName || "-"}</p>
                         <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
+                        <p className="md:col-span-2 break-all font-mono text-xs text-slate-400">Razorpay Order ID: {ad.razorpayOrderId || "-"}</p>
+                        <p className="md:col-span-2 break-all font-mono text-xs text-slate-400">Razorpay Payment ID: {ad.razorpayPaymentId || "-"}</p>
+                        <p className="md:col-span-2 break-all font-mono text-xs text-slate-400">Razorpay Signature: {ad.razorpaySignature || "-"}</p>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3">
                         <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
@@ -2241,14 +2292,21 @@ export const DashboardPage = () => {
                       <div className="mt-4 grid gap-2 text-sm text-slate-500">
                         <p>Advertiser: {ad.advertiserName || "-"}</p>
                         <p>Email: {ad.advertiserEmail || "-"}</p>
+                        <p>Payer Account Email: {ad.advertiser?.email || ad.advertiserEmail || "-"}</p>
                         <p>Phone: {ad.advertiserPhone || "-"}</p>
                         <p>Company: {ad.companyName || "-"}</p>
                         <p>Priority: {ad.priority}</p>
                         <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
                         <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
                         <p>Target URL: {ad.targetUrl || "Not provided"}</p>
-                        <p>Paid At: {formatDate(ad.paidAt)}</p>
+                        <p>Created At: {formatDateTime(ad.createdAt)}</p>
+                        <p>Paid At: {formatDateTime(ad.paidAt)}</p>
+                        <p>Reviewed At: {formatDateTime(ad.reviewedAt)}</p>
+                        <p>Reviewed By: {ad.reviewedBy?.fullName || "-"}</p>
                         <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
+                        <p className="break-all font-mono text-xs text-slate-400">Razorpay Order ID: {ad.razorpayOrderId || "-"}</p>
+                        <p className="break-all font-mono text-xs text-slate-400">Razorpay Payment ID: {ad.razorpayPaymentId || "-"}</p>
+                        <p className="break-all font-mono text-xs text-slate-400">Razorpay Signature: {ad.razorpaySignature || "-"}</p>
                         {ad.notes ? <p>Notes: {ad.notes}</p> : null}
                         {ad.rejectionReason ? <p>Review note: {ad.rejectionReason}</p> : null}
                       </div>
