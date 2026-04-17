@@ -49,6 +49,8 @@ const formatCurrency = (value) =>
 
 const isTestRazorpayKey = (value) => String(value || "").startsWith("rzp_test_");
 const getBannerPreviewUrl = (value) => String(value || "").trim();
+const PALAMU_EXPRESS_CHECKOUT_LOGO =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='48' fill='%23f97316'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-size='108' font-weight='700' fill='white'%3EPE%3C/text%3E%3C/svg%3E";
 
 export const AdvertisePage = () => {
   const [form, setForm] = useState(initialForm);
@@ -113,16 +115,21 @@ export const AdvertisePage = () => {
       name: form.title || "Advertisement Request",
       description: `${placementLabels[form.placement] || form.placement} for ${selectedPlan?.days || 0} day${selectedPlan?.days > 1 ? "s" : ""}`,
       order_id: order.id,
-      image: String(ad.imageUrl || "").startsWith("http") ? ad.imageUrl : undefined,
+      image: PALAMU_EXPRESS_CHECKOUT_LOGO,
       prefill: {
         name: form.advertiserName,
         email: form.advertiserEmail,
         contact: form.advertiserPhone,
       },
+      method: {
+        upi: true,
+        card: true,
+        netbanking: true,
+        wallet: true,
+      },
       notes: {
         placement: placementLabels[form.placement] || form.placement,
         campaign: form.title,
-        banner_image: ad.imageUrl || "",
       },
       theme: {
         color: "#f97316",
@@ -289,7 +296,7 @@ export const AdvertisePage = () => {
                   <p>Banner source: <span className="text-white">{String(form.imageUrl || "").startsWith("http") ? "Image URL" : "Uploaded image"}</span></p>
                 </div>
                 <p className="rounded-2xl border border-orange-300/20 bg-orange-500/10 p-4 text-sm leading-6 text-orange-100">
-                  This campaign banner preview is shown before Razorpay opens. If your banner uses a direct image URL, the same image is also passed to Razorpay as the checkout logo.
+                  This campaign banner preview is shown before Razorpay opens. Razorpay checkout itself uses the fixed Palamu Express logo for every payment.
                 </p>
                 <button type="button" onClick={confirmCheckout} disabled={submitting} className="w-full rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white disabled:opacity-60">
                   {submitting ? "Preparing..." : `Continue to Razorpay for ${formatCurrency(selectedPlan?.amount)}`}

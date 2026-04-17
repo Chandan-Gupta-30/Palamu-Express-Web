@@ -693,6 +693,7 @@ export const DashboardPage = () => {
   };
 
   const startEditAd = (ad) => {
+    setShowAdRequestsPanel(false);
     setEditingAdId(ad._id);
     setAdForm({
       advertiserName: ad.advertiserName || "",
@@ -716,7 +717,7 @@ export const DashboardPage = () => {
         behavior: "smooth",
         block: "center",
       });
-    }, 0);
+    }, 180);
   };
 
   const deleteAd = async (adId) => {
@@ -1879,7 +1880,9 @@ export const DashboardPage = () => {
           <button
             type="button"
             onClick={() => setShowAdRequestsPanel(true)}
-            className="fixed bottom-6 right-6 z-[70] inline-flex items-center gap-3 rounded-full border border-orange-300/35 bg-slate-950/95 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-orange-300/60 hover:bg-slate-900"
+            className={`fixed right-6 z-[70] inline-flex items-center gap-3 rounded-full border border-orange-300/35 bg-slate-950/95 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-orange-300/60 hover:bg-slate-900 ${
+              showDashboardActions ? "bottom-40 sm:bottom-32" : "bottom-6"
+            }`}
           >
             <Megaphone className="h-5 w-5 text-orange-300" />
             <span>Ad Requests</span>
