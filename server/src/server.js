@@ -11,7 +11,7 @@ const bootstrap = async () => {
   const server = http.createServer();
   const io = new Server(server, {
     cors: {
-      origin: env.clientUrl,
+      origin: env.clientUrls,
       methods: ["GET", "POST", "PATCH"],
     },
   });

@@ -25,9 +25,23 @@ const normalizeSecretValue = (value) => {
   return trimmed;
 };
 
+const splitConfiguredUrls = (value) =>
+  String(value || "")
+    .split(",")
+    .map((entry) => normalizeSecretValue(entry))
+    .filter(Boolean)
+    .map((entry) => entry.replace(/\/+$/, ""));
+
+const configuredClientUrls = splitConfiguredUrls(process.env.CLIENT_URLS);
+const fallbackClientUrl = normalizeSecretValue(process.env.CLIENT_URL) || "http://localhost:5173";
+const allowedClientUrls = configuredClientUrls.length
+  ? configuredClientUrls
+  : [fallbackClientUrl.replace(/\/+$/, "")];
+
 export const env = {
   port: process.env.PORT || 5000,
-  clientUrl: normalizeSecretValue(process.env.CLIENT_URL) || "http://localhost:5173",
+  clientUrl: allowedClientUrls[0],
+  clientUrls: allowedClientUrls,
   mongoUri: normalizeSecretValue(process.env.MONGODB_URI),
   jwtSecret: normalizeSecretValue(process.env.JWT_SECRET) || "change-me",
   jwtExpiresIn: normalizeSecretValue(process.env.JWT_EXPIRES_IN) || "7d",

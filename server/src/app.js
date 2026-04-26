@@ -16,10 +16,19 @@ import { env } from "./config/env.js";
 import { errorHandler, notFound } from "./middlewares/errorHandler.js";
 import { getArticleSharePreview } from "./controllers/articleController.js";
 
+const corsOrigin = (origin, callback) => {
+  if (!origin || env.clientUrls.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  callback(new Error(`CORS origin not allowed: ${origin}`));
+};
+
 export const createApp = (io) => {
   const app = express();
 
-  app.use(cors({ origin: env.clientUrl, credentials: true }));
+  app.use(cors({ origin: corsOrigin, credentials: true }));
   app.use(helmet());
   app.use(express.json({ limit: "10mb" }));
   app.use(cookieParser());
