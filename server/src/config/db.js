@@ -1,11 +1,10 @@
-import mongoose from "mongoose";
-import { env } from "./env.js";
+import { isFirebaseInitialized } from "./firebase.js";
 
 export const connectDb = async () => {
-  if (!env.mongoUri) {
-    throw new Error("MONGODB_URI is missing");
+  if (isFirebaseInitialized) {
+    console.log("[Database] Connected successfully to Firestore & Firebase Storage.");
+  } else {
+    console.log("[Database] Operating in Firebase offline/mock mode. Live operations require service account credentials.");
   }
-
-  await mongoose.connect(env.mongoUri);
 };
 

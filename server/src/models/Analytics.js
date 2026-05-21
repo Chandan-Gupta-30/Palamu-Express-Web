@@ -1,14 +1,24 @@
-import mongoose from "mongoose";
+import { FirestoreModel, FirestoreDocument } from "./FirestoreModel.js";
 
-const analyticsSchema = new mongoose.Schema(
-  {
-    article: { type: mongoose.Schema.Types.ObjectId, ref: "Article" },
-    slug: { type: String, required: true },
-    views: { type: Number, default: 0 },
-    liveVisitors: { type: Number, default: 0 },
-  },
-  { timestamps: true }
-);
+class AnalyticsDocument extends FirestoreDocument {
+  constructor(modelClass, data) {
+    super(modelClass, data);
+    if (this.views === undefined) this.views = 0;
+    if (this.liveVisitors === undefined) this.liveVisitors = 0;
+  }
 
-export const Analytics = mongoose.model("Analytics", analyticsSchema);
+  async preSave(rawData) {
+    if (rawData.views === undefined) rawData.views = 0;
+    if (rawData.liveVisitors === undefined) rawData.liveVisitors = 0;
+  }
+}
 
+export class Analytics extends FirestoreModel {
+  static get collectionName() {
+    return "analytics";
+  }
+
+  static get InstanceClass() {
+    return AnalyticsDocument;
+  }
+}

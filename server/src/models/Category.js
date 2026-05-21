@@ -1,15 +1,22 @@
-import mongoose from "mongoose";
+import { FirestoreModel, FirestoreDocument } from "./FirestoreModel.js";
 
-const categorySchema = new mongoose.Schema(
-  {
-    state: { type: String, default: "Jharkhand" },
-    district: { type: String, required: true },
-    block: { type: String, required: true },
-    slug: { type: String, required: true, unique: true },
-    description: { type: String },
-  },
-  { timestamps: true }
-);
+class CategoryDocument extends FirestoreDocument {
+  constructor(modelClass, data) {
+    super(modelClass, data);
+    if (this.state === undefined) this.state = "Jharkhand";
+  }
 
-export const Category = mongoose.model("Category", categorySchema);
+  async preSave(rawData) {
+    if (rawData.state === undefined) rawData.state = "Jharkhand";
+  }
+}
 
+export class Category extends FirestoreModel {
+  static get collectionName() {
+    return "categories";
+  }
+
+  static get InstanceClass() {
+    return CategoryDocument;
+  }
+}

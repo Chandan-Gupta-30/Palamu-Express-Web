@@ -1,22 +1,24 @@
-import mongoose from "mongoose";
+import { FirestoreModel, FirestoreDocument } from "./FirestoreModel.js";
 
-const contactStatuses = ["new", "in_progress", "resolved"];
+class ContactMessageDocument extends FirestoreDocument {
+  constructor(modelClass, data) {
+    super(modelClass, data);
+    if (this.status === undefined) this.status = "new";
+    if (this.adminNote === undefined) this.adminNote = "";
+  }
 
-const contactMessageSchema = new mongoose.Schema(
-  {
-    fullName: { type: String, required: true, trim: true },
-    email: { type: String, required: true, trim: true, lowercase: true },
-    phone: { type: String, trim: true },
-    subject: { type: String, required: true, trim: true },
-    message: { type: String, required: true, trim: true },
-    status: {
-      type: String,
-      enum: contactStatuses,
-      default: "new",
-    },
-    adminNote: { type: String, trim: true, default: "" },
-  },
-  { timestamps: true }
-);
+  async preSave(rawData) {
+    if (rawData.status === undefined) rawData.status = "new";
+    if (rawData.adminNote === undefined) rawData.adminNote = "";
+  }
+}
 
-export const ContactMessage = mongoose.model("ContactMessage", contactMessageSchema);
+export class ContactMessage extends FirestoreModel {
+  static get collectionName() {
+    return "contactmessages";
+  }
+
+  static get InstanceClass() {
+    return ContactMessageDocument;
+  }
+}

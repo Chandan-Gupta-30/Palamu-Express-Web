@@ -1,14 +1,11 @@
-import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { User } from "../models/User.js";
+import { connectDb } from "../config/db.js";
 
 dotenv.config({ path: "./.env" });
 
-const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/palamu-express";
-
 async function run() {
-  await mongoose.connect(mongoUri);
-  console.log("Connected successfully!");
+  await connectDb();
 
   // Find the existing super admin
   let admin = await User.findOne({ role: "super_admin" });
@@ -31,8 +28,6 @@ async function run() {
     });
     console.log("Super Admin created successfully!");
   }
-
-  await mongoose.disconnect();
 }
 
 run().catch(err => {

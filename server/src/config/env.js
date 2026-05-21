@@ -45,6 +45,11 @@ export const env = {
   mongoUri: normalizeSecretValue(process.env.MONGODB_URI),
   jwtSecret: normalizeSecretValue(process.env.JWT_SECRET) || "change-me",
   jwtExpiresIn: normalizeSecretValue(process.env.JWT_EXPIRES_IN) || "7d",
+  firebase: {
+    serviceAccountPath: normalizeSecretValue(process.env.FIREBASE_SERVICE_ACCOUNT_PATH) || "./.firebase-service-account.json",
+    storageBucket: normalizeSecretValue(process.env.FIREBASE_STORAGE_BUCKET) || "palamu-express-web.firebasestorage.app",
+    projectId: normalizeSecretValue(process.env.FIREBASE_PROJECT_ID) || "palamu-express-web",
+  },
   cloudinary: {
     cloudName: normalizeSecretValue(process.env.CLOUDINARY_CLOUD_NAME),
     apiKey: normalizeSecretValue(process.env.CLOUDINARY_API_KEY),

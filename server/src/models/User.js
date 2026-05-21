@@ -1,50 +1,41 @@
-import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import { FirestoreModel, FirestoreDocument } from "./FirestoreModel.js";
 import { approvalStatuses, roles } from "../utils/constants.js";
 
-const userSchema = new mongoose.Schema(
-  {
-    fullName: { type: String, required: true, trim: true },
-    email: { type: String, trim: true, lowercase: true },
-    phone: { type: String, required: true, unique: true },
-    password: { type: String, required: true, minlength: 6 },
-    role: {
-      type: String,
-      enum: Object.values(roles),
-      default: roles.ADVERTISER,
-    },
-    approvalStatus: {
-      type: String,
-      enum: Object.values(approvalStatuses),
-      default: approvalStatuses.PENDING,
-    },
-    isPhoneVerified: { type: Boolean, default: false },
-    aadhaarNumber: { type: String },
-    district: { type: String },
-    area: { type: String },
-    profilePhotoUrl: { type: String },
-    aadhaarImageUrl: { type: String },
-    livePhotoUrl: { type: String },
-    reporterCode: { type: String, unique: true, sparse: true },
-    chiefEditorCode: { type: String, unique: true, sparse: true },
-    idCardUrl: { type: String },
-    phoneOtpCode: { type: String, select: false },
-    phoneOtpExpiresAt: { type: Date, select: false },
-    bookmarks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Article" }],
-    rejectionFeedback: { type: String },
-    isFunctionalityDisabled: { type: Boolean, default: false },
-  },
-  { timestamps: true }
-);
+class UserDocument extends FirestoreDocument {
+  constructor(modelClass, data) {
+    super(modelClass, data);
+    if (this.role === undefined) this.role = roles.ADVERTISER;
+    if (this.approvalStatus === undefined) this.approvalStatus = approvalStatuses.PENDING;
+    if (this.isPhoneVerified === undefined) this.isPhoneVerified = false;
+    if (this.isFunctionalityDisabled === undefined) this.isFunctionalityDisabled = false;
+    if (this.bookmarks === undefined) this.bookmarks = [];
+  }
 
-userSchema.pre("save", async function save(next) {
-  if (!this.isModified("password")) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
-});
+  async preSave(rawData) {
+    if (rawData.password && !(rawData.password.length === 60 && rawData.password.startsWith("$2"))) {
+      rawData.password = await bcrypt.hash(rawData.password, 10);
+      this.password = rawData.password;
+    }
 
-userSchema.methods.comparePassword = function comparePassword(candidate) {
-  return bcrypt.compare(candidate, this.password);
-};
+    if (rawData.role === undefined) rawData.role = roles.ADVERTISER;
+    if (rawData.approvalStatus === undefined) rawData.approvalStatus = approvalStatuses.PENDING;
+    if (rawData.isPhoneVerified === undefined) rawData.isPhoneVerified = false;
+    if (rawData.isFunctionalityDisabled === undefined) rawData.isFunctionalityDisabled = false;
+    if (rawData.bookmarks === undefined) rawData.bookmarks = [];
+  }
 
-export const User = mongoose.model("User", userSchema);
+  comparePassword(candidate) {
+    return bcrypt.compare(candidate, this.password || "");
+  }
+}
+
+export class User extends FirestoreModel {
+  static get collectionName() {
+    return "users";
+  }
+
+  static get InstanceClass() {
+    return UserDocument;
+  }
+}

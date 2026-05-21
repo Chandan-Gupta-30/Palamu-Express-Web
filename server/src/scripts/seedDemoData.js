@@ -1,14 +1,11 @@
-import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { User } from "../models/User.js";
 import { Article } from "../models/Article.js";
 import { Advertisement } from "../models/Advertisement.js";
 import { Category } from "../models/Category.js";
-import { env } from "../config/env.js";
+import { connectDb } from "../config/db.js";
 import { adPlacements, approvalStatuses, adStatuses, articleStatuses, jharkhandBlocksByDistrict, roles } from "../utils/constants.js";
 import { generateReporterCardBuffer } from "../utils/generateReporterCard.js";
-
-dotenv.config({ path: "./server/.env" });
 
 const reporters = [
   {
@@ -51,13 +48,17 @@ const slugify = (value) =>
 const ensureReporterCard = async (user) => {
   if (user.role !== roles.REPORTER || user.approvalStatus !== approvalStatuses.APPROVED) return;
   if (user.idCardUrl) return;
-  const pdfBuffer = await generateReporterCardBuffer(user);
-  user.idCardUrl = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
-  await user.save();
+  try {
+    const pdfBuffer = await generateReporterCardBuffer(user);
+    user.idCardUrl = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+    await user.save();
+  } catch (err) {
+    console.error(`Failed to generate reporter card for ${user.fullName}:`, err.message);
+  }
 };
 
 const seed = async () => {
-  await mongoose.connect(env.mongoUri);
+  await connectDb();
 
   let admin = await User.findOne({ role: roles.SUPER_ADMIN });
   if (!admin) {
@@ -90,6 +91,7 @@ const seed = async () => {
       excerpt: "Government schools across Medininagar have begun a district-level digital attendance initiative.",
       content:
         "Government schools across Medininagar have begun a district-level digital attendance initiative to improve transparency, attendance monitoring, and parent communication. Education officials say the pilot will expand to more blocks after the first month of rollout.",
+      coverImageUrl: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=1200&q=80",
       district: "Palamu",
       area: "Medininagar",
       status: articleStatuses.PUBLISHED,
@@ -105,6 +107,7 @@ const seed = async () => {
       excerpt: "Residents have asked for urgent repair work on a road linking farms to the local mandi.",
       content:
         "Residents in several villages under Hussainabad block have asked district authorities to begin urgent road restoration before the next market cycle. Farmers say transport costs are rising because of damaged approach roads.",
+      coverImageUrl: "https://images.unsplash.com/photo-1599839575945-a9e5af0c3fa5?auto=format&fit=crop&w=1200&q=80",
       district: "Palamu",
       area: "Hussainabad",
       status: articleStatuses.PENDING,
@@ -118,6 +121,7 @@ const seed = async () => {
       excerpt: "Transport users in Kanke and nearby areas say the revised route can reduce crowding during office hours.",
       content:
         "Transport users in Kanke and nearby areas say the revised route can reduce crowding during peak office hours. Officials are collecting public feedback before notifying the final route schedule.",
+      coverImageUrl: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80",
       district: "Ranchi",
       area: "Kanke",
       status: articleStatuses.PENDING,
@@ -131,6 +135,7 @@ const seed = async () => {
       excerpt: "A local health camp saw strong participation with free screening support for families.",
       content:
         "A community health camp in Chainpur drew strong participation, with free screening support for women, children, and elderly residents. Organizers said the next camp will focus on follow-up consultations and awareness sessions.",
+      coverImageUrl: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1200&q=80",
       district: "Palamu",
       area: "Chainpur",
       status: articleStatuses.PUBLISHED,
@@ -220,11 +225,10 @@ const seed = async () => {
   console.log("Approved Reporter: 9000000001 / reporter123");
   console.log("Pending Reporter: 9000000002 / reporter123");
 
-  await mongoose.disconnect();
+  process.exit(0);
 };
 
-seed().catch(async (error) => {
+seed().catch((error) => {
   console.error("Demo seed failed", error);
-  await mongoose.disconnect();
   process.exit(1);
 });

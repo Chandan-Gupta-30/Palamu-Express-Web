@@ -29,7 +29,30 @@ export const createApp = (io) => {
   const app = express();
 
   app.use(cors({ origin: corsOrigin, credentials: true }));
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          "img-src": [
+            "'self'",
+            "data:",
+            "https://images.unsplash.com",
+            "https://*.unsplash.com",
+            "https://firebasestorage.googleapis.com",
+            "https://storage.googleapis.com"
+          ],
+          "media-src": [
+            "'self'",
+            "data:",
+            "https://firebasestorage.googleapis.com",
+            "https://storage.googleapis.com"
+          ]
+        }
+      },
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" }
+    })
+  );
   app.use(express.json({ limit: "10mb" }));
   app.use(cookieParser());
   app.use(morgan("dev"));
