@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 import { http } from "../api/http";
 import { ImagePicker } from "../components/onboarding/ImagePicker";
 import { WebcamCapture } from "../components/onboarding/WebcamCapture";
 import { ActionPopup } from "../components/ui/ActionPopup";
 import { jharkhandBlocksByDistrict, jharkhandDistricts } from "../data/districts";
+import { TermsModal } from "../components/onboarding/TermsModal";
 
 const initialForm = {
   fullName: "",
@@ -19,6 +20,7 @@ const initialForm = {
   profilePhotoUrl: "",
   aadhaarImageUrl: "",
   livePhotoUrl: "",
+  termsAccepted: false,
 };
 
 export const RegisterPage = () => {
@@ -31,6 +33,7 @@ export const RegisterPage = () => {
   const [otp, setOtp] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const updateDigitsOnlyField = (field, maxLength) => (event) => {
     const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, maxLength);
@@ -92,6 +95,10 @@ export const RegisterPage = () => {
 
     if (form.role === "chief_editor" && !String(form.livePhotoUrl || "").trim()) {
       return "Please capture your live photo before submitting the enrollment form.";
+    }
+
+    if (!form.termsAccepted) {
+      return "Please accept the Terms & Conditions before submitting the enrollment form.";
     }
 
     return "";
@@ -291,6 +298,29 @@ export const RegisterPage = () => {
           </div>
         ) : null}
 
+        <div className="flex items-start gap-3 md:col-span-2 my-2">
+          <input
+            id="termsAccepted"
+            type="checkbox"
+            checked={form.termsAccepted || false}
+            onChange={(event) => setForm({ ...form, termsAccepted: event.target.checked })}
+            className="mt-1 h-5 w-5 rounded border-white/10 bg-white/5 text-orange-500 focus:ring-orange-500"
+          />
+          <label htmlFor="termsAccepted" className="text-sm leading-6 text-slate-300">
+            I have read and agree to the{" "}
+            <button
+              type="button"
+              onClick={() => setShowTermsModal(true)}
+              className="font-semibold text-orange-300 underline hover:text-orange-200"
+            >
+              Palamu Express Terms & Conditions Agreement
+            </button>
+            .
+          </label>
+        </div>
+
+        <TermsModal open={showTermsModal} onClose={() => setShowTermsModal(false)} userName={form.fullName} />
+
         <button disabled={submitting} className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white disabled:opacity-60 md:col-span-2">
           {submitting ? "Submitting..." : "Submit Enrollment"}
         </button>
@@ -301,3 +331,4 @@ export const RegisterPage = () => {
     </div>
   );
 };
+

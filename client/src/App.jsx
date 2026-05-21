@@ -14,6 +14,7 @@ import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { ContactPage } from "./pages/ContactPage";
 import { AdvertisePage } from "./pages/AdvertisePage";
+import { VerificationPage } from "./pages/VerificationPage";
 import { useAuth } from "./context/AuthContext";
 
 const canAccessDashboard = (user) =>
@@ -49,10 +50,12 @@ export default function App() {
     localStorage.setItem("portal_theme", darkMode ? "dark" : "light");
   }, [darkMode]);
 
+  const isVerifyPage = location.pathname.startsWith("/verify/");
+
   return (
     <div className="min-h-screen">
       <ScrollToTop />
-      <Header darkMode={darkMode} onToggleDarkMode={() => setDarkMode((value) => !value)} />
+      {!isVerifyPage && <Header darkMode={darkMode} onToggleDarkMode={() => setDarkMode((value) => !value)} />}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/article/:slug" element={<ArticlePage />} />
@@ -63,6 +66,7 @@ export default function App() {
         <Route path="/terms-and-conditions" element={<TermsPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/advertise-with-us" element={<AdvertisePage />} />
+        <Route path="/verify/:code" element={<VerificationPage />} />
         <Route
           path="/saved"
           element={
@@ -81,7 +85,7 @@ export default function App() {
         />
       </Routes>
       {location.pathname === "/" ? <WhatsAppChannelButton /> : null}
-      <Footer />
+      {!isVerifyPage && <Footer />}
     </div>
   );
 }

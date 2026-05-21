@@ -4,6 +4,7 @@ import { Eye, EyeOff, FilePlus2, FolderKanban, IdCard, KeyRound, Megaphone, Mic,
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { VoiceNewsComposer } from "../components/audio/VoiceNewsComposer";
 import { MetricCard } from "../components/dashboard/MetricCard";
+import { IDCardPreview } from "../components/dashboard/IDCardPreview";
 import { ImagePicker } from "../components/onboarding/ImagePicker";
 import { WebcamCapture } from "../components/onboarding/WebcamCapture";
 import { ActionPopup } from "../components/ui/ActionPopup";
@@ -1364,15 +1365,30 @@ export const DashboardPage = () => {
               Update Credentials
             </button>
             {showReporterCardAction ? (
-              <a
-                href={reporterCardUrl}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const parts = reporterCardUrl.split(",");
+                    const base64Data = parts[1] || parts[0];
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                      byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: "application/pdf" });
+                    const blobUrl = URL.createObjectURL(blob);
+                    window.open(blobUrl, "_blank");
+                  } catch (err) {
+                    console.error("Failed to view ID card PDF", err);
+                  }
+                }}
                 className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full bg-white px-4 py-3 text-[13px] font-semibold text-slate-900 shadow-2xl shadow-slate-950/20 transition hover:bg-slate-100 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
               >
                 <IdCard size={18} />
                 {user?.role === "chief_editor" ? "Chief Editor ID Card" : "Reporter ID Card"}
-              </a>
+              </button>
             ) : null}
           </div>
           <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-3 sm:bottom-6 sm:right-6">
@@ -1430,7 +1446,7 @@ export const DashboardPage = () => {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className={`grid gap-6 lg:grid-cols-2 ${showReporterCardAction ? "xl:grid-cols-3" : ""}`}>
         <div className="panel p-6">
           <h2 className="text-xl font-semibold text-white">{onboardingTitle}</h2>
           {profile ? (
@@ -1476,6 +1492,10 @@ export const DashboardPage = () => {
             )}
           </div>
         </div>
+
+        {showReporterCardAction ? (
+          <IDCardPreview profile={profile} cardUrl={reporterCardUrl} />
+        ) : null}
       </div>
 
       {showCredentialForm ? (

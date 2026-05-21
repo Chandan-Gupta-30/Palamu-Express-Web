@@ -259,3 +259,25 @@ export const getStaffCard = asyncHandler(async (req, res) => {
 
   res.json({ idCardUrl: user.idCardUrl });
 });
+
+export const verifyUserByCode = asyncHandler(async (req, res) => {
+  const { code } = req.params;
+  if (!code) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: "Verification code is required" });
+  }
+
+  const normalizedCode = String(code).trim().toUpperCase();
+
+  const user = await User.findOne({
+    $or: [
+      { reporterCode: normalizedCode },
+      { chiefEditorCode: normalizedCode }
+    ]
+  }).select("fullName role approvalStatus district area profilePhotoUrl livePhotoUrl reporterCode chiefEditorCode createdAt");
+
+  if (!user) {
+    return res.status(StatusCodes.NOT_FOUND).json({ message: "No active record found for this accreditation code" });
+  }
+
+  res.json({ user });
+});

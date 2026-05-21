@@ -1,17 +1,55 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { http } from "../api/http";
 import { NewsCard } from "../components/news/NewsCard";
 import { jharkhandBlocksByDistrict, jharkhandDistricts } from "../data/districts";
 
 export const SearchPage = () => {
-  const [filters, setFilters] = useState({ district: "", area: "", keyword: "" });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const districtParam = searchParams.get("district") || "";
+  const areaParam = searchParams.get("area") || "";
+  const keywordParam = searchParams.get("keyword") || "";
+
+  const [filters, setFilters] = useState({
+    district: districtParam,
+    area: areaParam,
+    keyword: keywordParam,
+  });
   const [articles, setArticles] = useState([]);
   const blocks = filters.district ? jharkhandBlocksByDistrict[filters.district] || [] : [];
 
-  const handleSearch = async (event) => {
+  // URL search parameters are the single source of truth for loading data
+  useEffect(() => {
+    const activeFilters = {
+      district: searchParams.get("district") || "",
+      area: searchParams.get("area") || "",
+      keyword: searchParams.get("keyword") || "",
+    };
+    
+    // Sync local dropdown states with searchParams (vital for back/forward browser history)
+    setFilters(activeFilters);
+
+    if (activeFilters.district || activeFilters.area || activeFilters.keyword) {
+      http.get("/articles", { params: activeFilters })
+        .then(({ data }) => {
+          setArticles(data.articles || []);
+        })
+        .catch((err) => console.error("Auto search failed:", err));
+    } else {
+      // Clear articles if search filters are fully cleared
+      setArticles([]);
+    }
+  }, [searchParams]);
+
+  const handleSearch = (event) => {
     event.preventDefault();
-    const { data } = await http.get("/articles", { params: filters });
-    setArticles(data.articles);
+    
+    // Sync browser URL search parameters; this triggers the useEffect to perform the API fetch
+    const params = {};
+    if (filters.district) params.district = filters.district;
+    if (filters.area) params.area = filters.area;
+    if (filters.keyword) params.keyword = filters.keyword;
+    setSearchParams(params);
   };
 
   return (
@@ -47,11 +85,17 @@ export const SearchPage = () => {
         <button className="rounded-2xl bg-orange-500 px-6 py-3 font-semibold text-white">Search</button>
       </form>
 
-      <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {articles.map((article) => (
-          <NewsCard key={article._id} article={article} />
-        ))}
-      </div>
+      {articles.length > 0 ? (
+        <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {articles.map((article) => (
+            <NewsCard key={article._id} article={article} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-8 panel p-8 text-center text-slate-500">
+          No articles match your query. Adjust options and try searching again.
+        </div>
+      )}
     </div>
   );
 };
