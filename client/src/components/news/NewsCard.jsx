@@ -7,7 +7,7 @@ export const NewsCard = ({ article }) => (
   <article className="panel overflow-hidden">
     {article.coverImageUrl ? (
       <div className="flex h-44 items-center justify-center overflow-hidden bg-slate-950/40">
-        <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" />
+        <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" loading="lazy" />
       </div>
     ) : (
       <div className="h-44 bg-gradient-to-br from-orange-500/30 via-slate-800 to-slate-900" />
@@ -41,3 +41,29 @@ export const NewsCard = ({ article }) => (
     </div>
   </article>
 );
+
+export const NewsCardSkeleton = () => (
+  <div className="panel overflow-hidden animate-pulse">
+    <div className="h-44 bg-slate-800" />
+    <div className="space-y-4 p-5">
+      <div className="flex justify-between">
+        <div className="h-3 w-16 bg-slate-700 rounded" />
+        <div className="h-3 w-16 bg-slate-700 rounded" />
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full bg-slate-700" />
+        <div className="space-y-2 flex-1">
+          <div className="h-3 w-24 bg-slate-700 rounded" />
+          <div className="h-2 w-16 bg-slate-700 rounded" />
+        </div>
+      </div>
+      <div className="h-5 bg-slate-700 rounded w-5/6" />
+      <div className="space-y-2">
+        <div className="h-3 bg-slate-700 rounded" />
+        <div className="h-3 bg-slate-700 rounded w-4/5" />
+      </div>
+      <div className="h-8 bg-slate-700 rounded w-28" />
+    </div>
+  </div>
+);
+

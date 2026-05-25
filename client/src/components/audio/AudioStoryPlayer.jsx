@@ -129,7 +129,7 @@ export const AudioStoryPlayer = ({
   };
 
   return (
-    <div className={`rounded-[28px] border border-white/10 bg-white/[0.04] p-4 ${className}`}>
+    <div className={`rounded-[28px] border border-white/10 bg-white/[0.04] audio-reader-box p-4 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">

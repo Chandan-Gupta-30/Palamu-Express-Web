@@ -27,6 +27,15 @@ html.light body {
   @apply rounded-3xl border border-white/10 bg-white/5 backdrop-blur;
 }
 
+/* Enhance dark mode text legibility for lower-contrast slate utilities */
+.text-slate-400 {
+  color: #cbd5e1; /* Elevates sidebar & inactive tab text legibility */
+}
+
+.text-slate-500 {
+  color: #94a3b8; /* Elevates card labels, page counters, details & description contrast */
+}
+
 html.light .panel {
   border-color: rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.8);
@@ -43,22 +52,49 @@ html.light .section-title {
 
 html.light .text-slate-100,
 html.light .text-slate-200,
-html.light .text-slate-300,
+html.light .text-slate-300 {
+  color: #0f172a !important; /* High contrast primary text in light mode */
+}
+
 html.light .text-slate-400,
 html.light .text-slate-500 {
-  color: #334155 !important;
+  color: #475569 !important; /* High contrast secondary text in light mode */
 }
 
 html.light .bg-slate-950,
-html.light .bg-slate-900 {
+html.light .bg-slate-900,
+html.light .bg-slate-800 {
   background-color: #fff7ed !important;
 }
 
 html.light .bg-slate-950\/85,
 html.light .bg-slate-950\/95,
+html.light .bg-slate-950\/50,
 html.light .bg-slate-950\/40,
 html.light .bg-slate-900\/40 {
   background-color: rgba(255, 247, 237, 0.92) !important;
+}
+
+/* Transform dark arbitrary background containers cleanly in light mode */
+html.light .bg-\[\#05070c\]\/95,
+html.light .bg-\[\#05070c\]\/50,
+html.light .bg-\[\#05070c\] {
+  background-color: rgba(255, 247, 237, 0.96) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Custom premium glowing background for Audio Reader in light mode */
+html.light .audio-reader-box {
+  background: linear-gradient(135deg, rgba(254, 215, 170, 0.42), rgba(255, 255, 255, 0.88)) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+  box-shadow: 0 10px 35px rgba(249, 115, 22, 0.07);
+}
+
+/* Premium elevated glass background for bottom floating player in light mode */
+html.light .audio-floating-bar {
+  background: linear-gradient(135deg, rgba(255, 250, 244, 0.95), rgba(255, 255, 255, 0.95)) !important;
+  border-color: rgba(249, 115, 22, 0.3) !important;
+  box-shadow: 0 20px 50px rgba(249, 115, 22, 0.16) !important;
 }
 
 html.light .bg-white\/5 {
@@ -76,6 +112,7 @@ html.light .border-white\/15 {
   border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
+html.light .text-orange-400,
 html.light .text-orange-300,
 html.light .text-orange-200 {
   color: #c2410c !important;
@@ -85,7 +122,6 @@ html.light .text-rose-300 {
   color: #be123c !important;
 }
 
-html.light .text-orange-100,
 html.light .text-amber-100,
 html.light .text-amber-200,
 html.light .text-emerald-200,
@@ -108,7 +144,7 @@ html.light .text-amber-200 {
 }
 
 html.light .text-orange-100 {
-  color: #ffffff !important;
+  color: #c2410c !important; /* Resolves active reciting text being white in light mode */
 }
 
 html.light .text-white {
@@ -139,11 +175,19 @@ html.light footer {
   border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
-html.light .bg-orange-500.text-white,
-html.light .bg-green-600.text-white,
-html.light .bg-red-600.text-white,
-html.light .bg-rose-600.text-white,
-html.light .bg-emerald-600.text-white {
+/* Maintain white text on all solid colored backgrounds, buttons, and badges in light mode */
+html.light .bg-orange-500,
+html.light .bg-orange-600,
+html.light .bg-emerald-600,
+html.light .bg-green-600,
+html.light .bg-red-600,
+html.light .bg-rose-600,
+html.light .bg-orange-500 *,
+html.light .bg-orange-600 *,
+html.light .bg-emerald-600 *,
+html.light .bg-green-600 *,
+html.light .bg-red-600 *,
+html.light .bg-rose-600 * {
   color: #ffffff !important;
 }
 
@@ -275,4 +319,20 @@ html.light .dashboard-strong-text {
   .voice-desk-scroll {
     max-height: calc(100vh - 5rem);
   }
+}
+
+/* Sidebar Tab Navigation Buttons Glassy Premium Transitions */
+aside nav button {
+  border: 1px solid transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+aside nav button.bg-orange-500\/10 {
+  border-color: rgba(249, 115, 22, 0.2) !important;
+}
+
+html.light aside nav button.bg-orange-500\/10 {
+  border-color: rgba(249, 115, 22, 0.3) !important;
 }

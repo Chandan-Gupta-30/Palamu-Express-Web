@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { CalendarDays, Headphones, X } from "lucide-react";
 import { http } from "../api/http";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
-import { NewsCard } from "../components/news/NewsCard";
+import { NewsCard, NewsCardSkeleton } from "../components/news/NewsCard";
 import { WhatsAppIcon } from "../components/news/WhatsAppIcon";
 import { getArticleAuthorName, getArticlePublishedLabel, getWhatsAppShareLink } from "../utils/articles";
 
@@ -102,6 +102,13 @@ const WhatsAppShareLink = ({ article, className = "" }) => (
   </a>
 );
 
+const clientFeedCache = {};
+const clientFeedTimestamps = {};
+let clientAdsCache = null;
+let clientAdsTimestamp = 0;
+const CLIENT_CACHE_TTL = 30 * 1000;
+const CLIENT_ADS_TTL = 60 * 1000;
+
 export const HomePage = () => {
   const [feed, setFeed] = useState(initialFeed);
   const [ads, setAds] = useState([]);
@@ -116,16 +123,62 @@ export const HomePage = () => {
   }, [feed.breaking, feed.latest]);
 
   useEffect(() => {
-    setFeedLoading(true);
+    const cacheKey = `${selectedDate || "all"}-${latestPage}`;
+    const now = Date.now();
+    const cached = clientFeedCache[cacheKey];
+    const hasCache = Boolean(cached);
+
+    // 1. Instantly render the cached feed if we have it, enabling 0ms latency page restoration
+    if (hasCache) {
+      setFeed(cached);
+    }
+
+    // 2. Decide if we need to fetch a fresh feed from the server.
+    // We fetch if there's no cache, OR if the cache has expired (older than CLIENT_CACHE_TTL).
+    const needsRefetch = !hasCache || (now - clientFeedTimestamps[cacheKey] >= CLIENT_CACHE_TTL);
+
+    if (!needsRefetch) {
+      setFeedLoading(false);
+      return;
+    }
+
+    // Only display the loading skeleton/pulse effect if we have absolutely nothing cached for this date/page.
+    // If we have cached content, the fetch happens silently in the background for a smooth transition!
+    if (!hasCache) {
+      setFeedLoading(true);
+    }
+
     http
       .get("/articles/homepage/feed", { params: { date: selectedDate, page: latestPage } })
-      .then(({ data }) => setFeed({ ...initialFeed, ...data }))
-      .catch(() => setFeed(initialFeed))
+      .then(({ data }) => {
+        const feedData = { ...initialFeed, ...data };
+        clientFeedCache[cacheKey] = feedData;
+        clientFeedTimestamps[cacheKey] = Date.now();
+        setFeed(feedData);
+      })
+      .catch(() => {
+        if (!hasCache) {
+          setFeed(initialFeed);
+        }
+      })
       .finally(() => setFeedLoading(false));
   }, [latestPage, selectedDate]);
 
   useEffect(() => {
-    http.get("/ads/active").then(({ data }) => setAds(data.ads)).catch(() => {});
+    const now = Date.now();
+    if (clientAdsCache && now - clientAdsTimestamp < CLIENT_ADS_TTL) {
+      setAds(clientAdsCache);
+      return;
+    }
+
+    http
+      .get("/ads/active")
+      .then(({ data }) => {
+        clientAdsCache = data.ads;
+        clientAdsTimestamp = now;
+        setAds(data.ads);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -286,7 +339,21 @@ export const HomePage = () => {
               Advertise With Us
             </Link>
           </div>
-          {featured ? (
+          {feedLoading ? (
+            <div className="mt-4 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] animate-pulse">
+              <div className="space-y-4">
+                <div className="h-4 w-32 bg-slate-800 rounded" />
+                <div className="h-12 bg-slate-800 rounded w-5/6" />
+                <div className="h-6 bg-slate-800 rounded w-2/3" />
+                <div className="space-y-2">
+                  <div className="h-3 bg-slate-800 rounded w-full" />
+                  <div className="h-3 bg-slate-800 rounded w-4/5" />
+                </div>
+                <div className="h-10 bg-slate-800 rounded-full w-40" />
+              </div>
+              <div className="h-72 bg-slate-800 rounded-3xl" />
+            </div>
+          ) : featured ? (
             <div className="mt-4 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div>
                 {featured.audioUrl ? (
@@ -455,9 +522,15 @@ export const HomePage = () => {
         )}
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {visibleLatestArticles.map((article) => (
-            <NewsCard key={article._id} article={article} />
-          ))}
+          {feedLoading ? (
+            Array.from({ length: 6 }).map((_, index) => (
+              <NewsCardSkeleton key={`skeleton-${index}`} />
+            ))
+          ) : (
+            visibleLatestArticles.map((article) => (
+              <NewsCard key={article._id} article={article} />
+            ))
+          )}
         </div>
         {shouldShowLatestSummary ? (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4">

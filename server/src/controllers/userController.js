@@ -138,6 +138,13 @@ export const approveUser = asyncHandler(async (req, res) => {
   user.approvalStatus = approvalStatuses.APPROVED;
   user.rejectionFeedback = "";
 
+  // Automated Expiry: Default to exactly 1 Year from approval date if not set
+  if (!user.validUpto) {
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    user.validUpto = oneYearFromNow.toISOString().split("T")[0];
+  }
+
   if ([roles.REPORTER, roles.CHIEF_EDITOR].includes(user.role)) {
     await assignStaffIdentityArtifacts(user);
   }
@@ -170,6 +177,9 @@ export const updateUserByAdmin = asyncHandler(async (req, res) => {
     "approvalStatus",
     "isPhoneVerified",
     "isFunctionalityDisabled",
+    "validUpto",
+    "bloodGroup",
+    "education",
   ];
   const update = Object.fromEntries(
     Object.entries(req.body || {}).filter(([key]) => allowedFields.includes(key))
@@ -253,9 +263,13 @@ export const getStaffCard = asyncHandler(async (req, res) => {
     return res.status(StatusCodes.FORBIDDEN).json({ message: "Only reporters and chief editors can access ID cards" });
   }
 
-  if (!user.idCardUrl) {
-    return res.status(StatusCodes.NOT_FOUND).json({ message: "ID card is not generated yet" });
+  if (user.approvalStatus !== approvalStatuses.APPROVED) {
+    return res.status(StatusCodes.FORBIDDEN).json({ message: "Your account is not approved yet. ID card will be available after approval." });
   }
+
+  // Always regenerate on the fly to reflect any layout/template updates instantly!
+  await assignStaffIdentityArtifacts(user);
+  await user.save();
 
   res.json({ idCardUrl: user.idCardUrl });
 });

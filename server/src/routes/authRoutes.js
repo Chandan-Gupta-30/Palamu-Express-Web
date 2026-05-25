@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { body } from "express-validator";
-import { login, register, seedSuperAdmin, verifyPhoneOtp } from "../controllers/authController.js";
+import { login, register, seedSuperAdmin, verifyPhoneOtp, checkEmailVerification, mockVerifyEmailLink, sendEmailOtp, verifyEmailOtp } from "../controllers/authController.js";
 import { validate } from "../middlewares/validate.js";
 
 const router = Router();
@@ -19,6 +19,10 @@ router.post(
 );
 router.post("/login", [body("phone").notEmpty(), body("password").notEmpty()], validate, login);
 router.patch("/verify-phone/:userId", [body("otp").isLength({ min: 6, max: 6 })], validate, verifyPhoneOtp);
+router.get("/check-email-verification/:userId", checkEmailVerification);
+router.get("/mock-verify-email/:email", mockVerifyEmailLink);
+router.post("/send-email-otp", sendEmailOtp);
+router.post("/verify-email-otp", verifyEmailOtp);
 router.post("/seed-super-admin", seedSuperAdmin);
 
 export default router;

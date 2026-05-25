@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 export const termsData = {
@@ -284,8 +284,34 @@ export const termsData = {
   }
 };
 
-export const TermsModal = ({ open, onClose, userName }) => {
+export const TermsModal = ({ open, onClose, userName, onAccept }) => {
   const [lang, setLang] = useState("en");
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setHasScrolledToBottom(false);
+    }
+  }, [open]);
+
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    if (Math.ceil(scrollHeight - scrollTop) <= clientHeight + 15) {
+      setHasScrolledToBottom(true);
+    }
+  };
+
+  const handleUnderstand = () => {
+    if (!hasScrolledToBottom) {
+      alert(lang === "en"
+        ? "Please read and scroll through the entire Terms & Conditions agreement to the bottom before accepting."
+        : "कृपया स्वीकार करने से पहले इसे पढ़ने की पुष्टि करने के लिए नियम और शर्तें समझौते के बिल्कुल नीचे तक स्क्रॉल करें।"
+      );
+      return;
+    }
+    onAccept();
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -539,7 +565,7 @@ export const TermsModal = ({ open, onClose, userName }) => {
         </div>
 
         {/* Scrollable Terms Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm leading-7 text-slate-300">
+        <div onScroll={handleScroll} className="flex-1 overflow-y-auto p-6 space-y-6 text-sm leading-7 text-slate-300">
           <div className="border-b border-white/5 pb-4">
             <h3 className="text-lg font-bold text-white uppercase tracking-wide">
               {lang === "en" ? "PALAMU EXPRESS – TERMS & CONDITIONS AGREEMENT" : "पलामू एक्सप्रेस – नियम और शर्तें समझौता"}
@@ -627,8 +653,8 @@ export const TermsModal = ({ open, onClose, userName }) => {
           </button>
           <button
             type="button"
-            onClick={onClose}
-            className="rounded-full bg-orange-500 hover:bg-orange-400 transition px-6 py-2 text-sm font-semibold text-white"
+            onClick={handleUnderstand}
+            className={`rounded-full transition px-6 py-2 text-sm font-semibold text-white ${hasScrolledToBottom ? "bg-orange-500 hover:bg-orange-400 cursor-pointer" : "bg-orange-500/40 cursor-not-allowed"}`}
           >
             I Understand
           </button>

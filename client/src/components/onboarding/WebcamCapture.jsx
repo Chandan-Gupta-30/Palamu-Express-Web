@@ -34,31 +34,51 @@ export const WebcamCapture = ({ value, onCapture }) => {
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    onCapture(canvas.toDataURL("image/png"));
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+    const maxDim = 1000;
+
+    if (width > height) {
+      if (width > maxDim) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      }
+    } else {
+      if (height > maxDim) {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, width, height);
+
+    const compressedBase64 = canvas.toDataURL("image/jpeg", 0.75);
+    onCapture(compressedBase64);
     stopCamera();
   };
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition-all duration-300 hover:border-white/20 hover:bg-white/[0.04]">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-white">Live Photo Capture</p>
-          <p className="mt-1 text-xs text-slate-500">Required for chief editor enrollment.</p>
+        <div className="space-y-0.5">
+          <p className="text-xs font-bold text-slate-200">Live Photo Capture</p>
+          <p className="text-[10px] text-slate-500 leading-normal">Required for chief editor enrollment.</p>
         </div>
         <div className="flex gap-2">
           {!streamActive ? (
-            <button type="button" onClick={startCamera} className="rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white">
+            <button type="button" onClick={startCamera} className="rounded-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 transition-all duration-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-orange-950/20 shrink-0">
               Start Camera
             </button>
           ) : (
             <>
-              <button type="button" onClick={capture} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">
+              <button type="button" onClick={capture} className="rounded-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 transition-all duration-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-green-950/20 shrink-0">
                 Capture
               </button>
-              <button type="button" onClick={stopCamera} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
+              <button type="button" onClick={stopCamera} className="rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all duration-300 px-4 py-2 text-xs font-semibold text-slate-300">
                 Cancel
               </button>
             </>
@@ -66,16 +86,16 @@ export const WebcamCapture = ({ value, onCapture }) => {
         </div>
       </div>
 
-      <video ref={videoRef} autoPlay playsInline muted className={`mt-4 w-full rounded-2xl ${streamActive ? "block" : "hidden"}`} />
+      <video ref={videoRef} autoPlay playsInline muted className={`mt-4 w-full max-h-56 rounded-xl border border-white/10 shadow-inner ${streamActive ? "block animate-fadeIn" : "hidden"}`} />
       <canvas ref={canvasRef} className="hidden" />
 
       {value ? (
-        <div className="mt-4 flex h-52 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
-          <img src={value} alt="Live capture" className="h-full w-full object-contain" />
+        <div className="mt-4 flex h-40 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-slate-950/40 p-1.5 shadow-inner group">
+          <img src={value} alt="Live capture headshot" className="h-full w-full rounded-lg object-contain transition-transform duration-500 group-hover:scale-105" />
         </div>
       ) : (
         !streamActive && (
-          <div className="mt-4 flex h-52 items-center justify-center rounded-2xl border border-dashed border-white/15 text-sm text-slate-400">
+          <div className="mt-4 flex h-40 items-center justify-center rounded-xl border border-dashed border-white/10 text-xs text-slate-500 bg-slate-950/20">
             No live photo captured yet
           </div>
         )
@@ -83,3 +103,4 @@ export const WebcamCapture = ({ value, onCapture }) => {
     </div>
   );
 };
+

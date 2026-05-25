@@ -419,7 +419,47 @@ export const ArticlePage = () => {
   }, [slug, location.key]);
 
   if (!article) {
-    return <div className="mx-auto max-w-4xl px-4 py-12 text-slate-500">Loading article...</div>;
+    return (
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 animate-pulse">
+        {/* Breadcrumb Skeleton */}
+        <div className="h-4 w-32 bg-slate-800 rounded" />
+
+        {/* Title and Meta Skeleton */}
+        <div className="space-y-4 pt-4">
+          <div className="h-4 w-24 bg-slate-800 rounded" />
+          <div className="h-10 w-3/4 bg-slate-800 rounded md:h-12" />
+          <div className="h-4 w-1/2 bg-slate-800 rounded" />
+        </div>
+
+        {/* Audio Player Skeleton */}
+        <div className="panel p-5 space-y-3 bg-slate-900/10 border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-slate-800" />
+            <div className="space-y-2">
+              <div className="h-3 w-28 bg-slate-800 rounded" />
+              <div className="h-4 w-48 bg-slate-800 rounded" />
+            </div>
+          </div>
+        </div>
+
+        {/* Cover Image Skeleton */}
+        <div className="h-80 w-full bg-slate-800 rounded-3xl" />
+
+        {/* Story Paragraphs Skeleton */}
+        <div className="panel p-8 space-y-6 bg-slate-900/10 border-white/5">
+          <div className="space-y-3">
+            <div className="h-3.5 w-full bg-slate-800 rounded" />
+            <div className="h-3.5 w-5/6 bg-slate-800 rounded" />
+            <div className="h-3.5 w-4/5 bg-slate-800 rounded" />
+          </div>
+          <div className="space-y-3">
+            <div className="h-3.5 w-full bg-slate-800 rounded" />
+            <div className="h-3.5 w-11/12 bg-slate-800 rounded" />
+            <div className="h-3.5 w-3/4 bg-slate-800 rounded" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const articleUrl = getArticlePageUrl(slug);
@@ -462,7 +502,7 @@ export const ArticlePage = () => {
       ) : null}
       <div className="space-y-3">
         <p className="text-sm uppercase tracking-[0.3em] text-orange-300">
-          {article.district} • {article.area}
+          {[article.district, article.area, article.panchayat].filter(Boolean).join(" • ")}
         </p>
         <h1 className="font-display text-4xl text-white md:text-5xl">{article.title}</h1>
         <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs font-semibold text-slate-400">
@@ -485,7 +525,7 @@ export const ArticlePage = () => {
 
       {/* Top Audio Playback Control Bar */}
       {parsedStructure.sentences.length > 0 && (
-        <div className="relative overflow-hidden flex flex-col rounded-2xl border border-white/10 bg-slate-900/60 p-4 backdrop-blur-md">
+        <div className="relative overflow-hidden flex flex-col rounded-2xl border border-white/10 bg-slate-900/60 audio-reader-box p-4 backdrop-blur-md">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3">
               <button
@@ -708,7 +748,7 @@ export const ArticlePage = () => {
 
       {/* Floating Control Bar that moves along the smooth scrolling */}
       {isPlaying && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-col rounded-[24px] border border-orange-500/30 bg-slate-950/90 shadow-[0_20px_50px_rgba(249,115,22,0.2)] backdrop-blur-lg animate-in fade-in slide-in-from-bottom-4 duration-300 overflow-hidden min-w-[340px]">
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-col rounded-[24px] border border-orange-500/30 bg-slate-950/90 audio-floating-bar shadow-[0_20px_50px_rgba(249,115,22,0.2)] backdrop-blur-lg animate-in fade-in slide-in-from-bottom-4 duration-300 overflow-hidden min-w-[340px]">
           {/* Glowing Top Progress Bar */}
           <div className="h-1 w-full bg-white/10">
             <div 

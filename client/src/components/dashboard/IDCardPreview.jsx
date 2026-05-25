@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Download, Printer, RefreshCw, ShieldCheck } from "lucide-react";
 
-export const IDCardPreview = ({ profile, cardUrl }) => {
+export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [blobUrl, setBlobUrl] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -216,44 +216,54 @@ export const IDCardPreview = ({ profile, cardUrl }) => {
               </p>
             </div>
 
-            {/* Grid Layout (Verifiable QR Code + Barcode) */}
-            <div className="px-4 flex gap-4 items-center justify-center flex-grow mt-[-4px]">
+            {/* Grid Layout (Verifiable QR Code + Official Staff Credentials) */}
+            <div className="px-4 flex gap-6 items-center justify-between flex-grow mt-[-4px]">
               
-              {/* QR Code Column */}
-              <div className="flex flex-col items-center gap-0.5">
-                <div className="w-[48px] h-[48px] bg-white p-0.5 rounded border border-slate-700/50 flex items-center justify-center shadow-md">
+              {/* Left Side: Verification QR Code */}
+              <div className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[110px]">
+                <div className="w-[50px] h-[50px] bg-white p-0.5 rounded border border-slate-700/50 flex items-center justify-center shadow-md">
                   <img 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(verifyUrl)}&color=0b0f19`}
                     alt="Verification QR Code" 
                     className="w-full h-full"
                   />
                 </div>
-                <span className="text-[5px] text-orange-400 font-extrabold tracking-widest leading-none mt-0.5">SCAN TO VERIFY</span>
+                <span className="text-[5.5px] text-orange-400 font-extrabold tracking-widest leading-none">SCAN TO VERIFY</span>
               </div>
 
-              {/* Barcode Column */}
-              <div className="flex flex-col items-center gap-0.5">
-                <div className="flex items-center justify-center bg-white/95 px-3 py-1 rounded-sm shadow-md h-[30px] w-[110px]">
-                  <div className="flex items-stretch h-5 bg-black text-black select-none gap-[1px]">
-                    <div className="w-[2px] bg-black"></div>
-                    <div className="w-[1px] bg-black"></div>
-                    <div className="w-[3px] bg-black"></div>
-                    <div className="w-[1px] bg-black"></div>
-                    <div className="w-[2px] bg-black"></div>
-                    <div className="w-[1px] bg-black"></div>
-                    <div className="w-[2px] bg-black"></div>
-                    <div className="w-[3px] bg-black"></div>
-                    <div className="w-[1px] bg-black"></div>
-                    <div className="w-[2px] bg-black"></div>
-                    <div className="w-[1px] bg-black"></div>
-                    <div className="w-[3px] bg-black"></div>
-                    <div className="w-[2px] bg-black"></div>
-                    <div className="w-[1px] bg-black"></div>
-                  </div>
+              {/* Vertical Divider */}
+              <div className="h-[75px] w-[0.5px] bg-slate-800" />
+
+              {/* Right Side: Official Staff Credentials */}
+              <div className="flex-grow flex flex-col justify-center text-left pl-2">
+                <div className="grid grid-cols-[82px_1fr] gap-x-1.5 gap-y-1.5 text-[8px] leading-none">
+                  <span className="text-slate-500 font-semibold uppercase tracking-wider">ACCREDITED SINCE:</span>
+                  <span className="text-slate-200 font-bold">{profile.createdAt ? new Date(profile.createdAt).getFullYear() : "2026"}</span>
+
+                  <span className="text-slate-500 font-semibold uppercase tracking-wider">VALID UPTO:</span>
+                  <span className="text-orange-400 font-extrabold tracking-wider">
+                    {(() => {
+                      const expiryValue = profile.validUpto || globalIdCardExpiry;
+                      if (expiryValue) {
+                        try {
+                          return new Date(expiryValue).toLocaleDateString("en-GB").replace(/\//g, "-");
+                        } catch (err) {
+                          console.error("Failed to parse validUpto date in screen mockup", err.message);
+                        }
+                      }
+                      return `31-12-${(profile.createdAt ? new Date(profile.createdAt).getFullYear() : 2026) + 1}`;
+                    })()}
+                  </span>
+
+                  <span className="text-slate-500 font-semibold uppercase tracking-wider">BLOOD GROUP:</span>
+                  <span className="text-slate-200 font-bold">{profile.bloodGroup || "O+"}</span>
+
+                  <span className="text-slate-500 font-semibold uppercase tracking-wider">EMERGENCY CALL:</span>
+                  <span className="text-slate-200 font-bold">{profile.phone || "+91 76674 82194"}</span>
+
+                  <span className="text-slate-500 font-semibold uppercase tracking-wider">OFFICIAL EMAIL:</span>
+                  <span className="text-slate-200 font-semibold truncate w-[105px]">desk@palamuexpress.in</span>
                 </div>
-                <span className="text-[7px] font-mono tracking-widest text-slate-400 mt-0.5 uppercase">
-                  {staffCode}
-                </span>
               </div>
               
             </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, FilePlus2, FolderKanban, IdCard, KeyRound, Megaphone, Mic, X } from "lucide-react";
+import { Eye, EyeOff, FilePlus2, FolderKanban, IdCard, KeyRound, Megaphone, Mic, X, LayoutDashboard, Users, UserCheck, Inbox, Settings, BookOpen, AlertCircle, Calendar, ShieldAlert, BadgeCheck, FileText, CheckSquare, Layers, Menu, Lock } from "lucide-react";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { VoiceNewsComposer } from "../components/audio/VoiceNewsComposer";
 import { MetricCard } from "../components/dashboard/MetricCard";
@@ -51,6 +51,7 @@ const initialArticleForm = {
   content: "",
   district: "",
   area: "",
+  panchayat: "",
   breaking: false,
   coverImageUrl: "",
   audioUrl: "",
@@ -90,6 +91,9 @@ const initialManagedUserForm = {
   profilePhotoUrl: "",
   aadhaarImageUrl: "",
   livePhotoUrl: "",
+  validUpto: "",
+  bloodGroup: "O+",
+  education: "",
 };
 
 const initialCredentialForm = {
@@ -250,7 +254,7 @@ const PublishedArchiveSection = ({
           id="published-news-archive-date"
           type="date"
           max={getTodayDateString()}
-          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
           value={selectedDate}
           onChange={(event) => onDateChange(event.target.value)}
         />
@@ -263,14 +267,14 @@ const PublishedArchiveSection = ({
         <span className="font-semibold text-orange-300">{selectedDate}</span>.
       </p>
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={onRefresh} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
+        <button type="button" onClick={onRefresh} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/5 transition">
           Refresh List
         </button>
         <button
           type="button"
           onClick={onDelete}
           disabled={busy || !articles.length}
-          className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-rose-500 transition"
         >
           {busy ? "Deleting..." : "Delete All For This Date"}
         </button>
@@ -294,17 +298,17 @@ const PublishedArchiveSection = ({
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <p className="text-lg font-semibold text-white">{article.title}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {article.audioUrl ? (
-                        <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
-                      ) : null}
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
-                    </div>
-                  </div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <p className="text-lg font-semibold text-white">{article.title}</p>
+                <div className="flex flex-wrap gap-2">
+                  {article.audioUrl ? (
+                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
+                  ) : null}
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
+                </div>
+              </div>
               <p className="text-sm text-slate-500">
-                By {article.author?.fullName || "Unknown"} • {article.district || "-"} • {article.area || "-"}
+                By {article.author?.fullName || "Unknown"} • {[article.district, article.area, article.panchayat].filter(Boolean).join(" • ") || "-"}
               </p>
               <p className="text-sm text-slate-500">Published: {getArticlePublishedLabel(article)}</p>
               <p className="text-sm text-slate-500">Views: {getArticleViews(article)}</p>
@@ -320,35 +324,41 @@ const PublishedArchiveSection = ({
             <button type="button" onClick={(event) => {
               event.stopPropagation();
               onEditArticle(article);
-            }} className="dashboard-outline-button rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
+            }} className="dashboard-outline-button rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition">
               Edit
             </button>
             <button type="button" onClick={(event) => {
               event.stopPropagation();
               onDeleteArticle(article);
-            }} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+            }} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">
               Delete
             </button>
             <button type="button" onClick={(event) => {
               event.stopPropagation();
               onCopyLink(article);
-            }} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
+            }} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/5 transition">
               Copy Link
             </button>
           </div>
         </div>
       ))}
       {!articles.length ? (
-        <p className="text-slate-500">No published articles are available for the selected date.</p>
+        <p className="text-slate-500 py-4 text-center">No published articles are available for the selected date.</p>
       ) : null}
     </div>
   </div>
 );
 
+let dashboardCache = null;
+let dashboardCacheTimestamp = 0;
+const DASHBOARD_CACHE_TTL = 15 * 1000; // Cache dashboard data for 15 seconds
+
 export const DashboardPage = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [profile, setProfile] = useState(null);
   const [reporterCardUrl, setReporterCardUrl] = useState("");
   const [myArticles, setMyArticles] = useState([]);
@@ -357,6 +367,7 @@ export const DashboardPage = () => {
   const [pendingArticles, setPendingArticles] = useState([]);
   const [ads, setAds] = useState([]);
   const [articleForm, setArticleForm] = useState(initialArticleForm);
+  const [articleErrors, setArticleErrors] = useState({});
   const [adForm, setAdForm] = useState(initialAdForm);
   const [feedbacks, setFeedbacks] = useState({});
   const [actionPopup, setActionPopup] = useState(null);
@@ -395,6 +406,10 @@ export const DashboardPage = () => {
   const [adSearch, setAdSearch] = useState("");
   const [adStatusFilter, setAdStatusFilter] = useState("all");
   const [adDateFilter, setAdDateFilter] = useState("");
+  const [globalIdCardExpiry, setGlobalIdCardExpiry] = useState("");
+  const [globalExpiryForm, setGlobalExpiryForm] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const articleBlocks = useMemo(
     () => (articleForm.district ? jharkhandBlocksByDistrict[articleForm.district] || [] : []),
@@ -517,18 +532,67 @@ export const DashboardPage = () => {
     http.get("/users/me").then(({ data }) => setProfile(data.user)).catch(() => {});
   };
 
-  const refreshMyArticles = () => {
-    const mineQuery = user?.role === "chief_editor" || user?.role === "super_admin" ? "&mine=true" : "";
-    http.get(`/articles/workflow/list?status=all${mineQuery}`).then(({ data }) => setMyArticles(dedupeArticlesById(data.articles))).catch(() => {});
+  const refreshDashboardPayload = async (force = false) => {
+    const now = Date.now();
+    const hasCache = Boolean(dashboardCache);
+
+    if (hasCache) {
+      const cached = dashboardCache;
+      if (cached.metrics) setMetrics(cached.metrics);
+      if (cached.pendingUsers) setPendingUsers(cached.pendingUsers);
+      if (cached.pendingArticles) setPendingArticles(cached.pendingArticles);
+      if (cached.managedUsers) setManagedUsers(cached.managedUsers);
+      if (cached.ads) setAds(cached.ads);
+      if (cached.contactMessages) setContactMessages(cached.contactMessages);
+      if (cached.myArticles) setMyArticles(cached.myArticles);
+      if (cached.publishedArchiveArticles) setPublishedArchiveArticles(cached.publishedArchiveArticles);
+      if (cached.globalIdCardExpiry !== undefined) {
+        setGlobalIdCardExpiry(cached.globalIdCardExpiry);
+        setGlobalExpiryForm(cached.globalIdCardExpiry || "");
+      }
+      setIsInitialLoad(false);
+    }
+
+    const needsRefetch = force || !hasCache || (now - dashboardCacheTimestamp >= DASHBOARD_CACHE_TTL);
+
+    if (!needsRefetch) {
+      return;
+    }
+
+    if (!hasCache && isInitialLoad) {
+      setDashboardLoading(true);
+    }
+
+    try {
+      const { data } = await http.get("/admin/dashboard-payload");
+      
+      dashboardCache = data;
+      dashboardCacheTimestamp = Date.now();
+
+      if (data.metrics) setMetrics(data.metrics);
+      if (data.pendingUsers) setPendingUsers(data.pendingUsers);
+      if (data.pendingArticles) setPendingArticles(data.pendingArticles);
+      if (data.managedUsers) setManagedUsers(data.managedUsers);
+      if (data.ads) setAds(data.ads);
+      if (data.contactMessages) setContactMessages(data.contactMessages);
+      if (data.myArticles) setMyArticles(data.myArticles);
+      if (data.publishedArchiveArticles) setPublishedArchiveArticles(data.publishedArchiveArticles);
+      if (data.globalIdCardExpiry !== undefined) {
+        setGlobalIdCardExpiry(data.globalIdCardExpiry);
+        setGlobalExpiryForm(data.globalIdCardExpiry || "");
+      }
+      setIsInitialLoad(false);
+    } catch (err) {
+      console.error("Failed to load dashboard payload:", err);
+    } finally {
+      setDashboardLoading(false);
+    }
   };
 
-  const refreshEditorialQueue = () => {
-    http.get("/articles/workflow/list?status=pending").then(({ data }) => setPendingArticles(dedupeArticlesById(data.articles))).catch(() => {});
-  };
-
-  const refreshChiefMetrics = () => {
-    http.get("/admin/overview").then(({ data }) => setMetrics(data.metrics)).catch(() => {});
-  };
+  const refreshMyArticles = () => refreshDashboardPayload(true);
+  const refreshEditorialQueue = () => refreshDashboardPayload(true);
+  const refreshChiefMetrics = () => refreshDashboardPayload(true);
+  const refreshAdminData = () => refreshDashboardPayload(true);
 
   const refreshPublishedArchive = (dateValue = publishedArchiveDate) => {
     if (!dateValue || !user || !["super_admin", "chief_editor"].includes(user.role)) {
@@ -540,19 +604,6 @@ export const DashboardPage = () => {
       .get("/articles/published/archive", { params: { date: dateValue } })
       .then(({ data }) => setPublishedArchiveArticles(data.articles))
       .catch(() => setPublishedArchiveArticles([]));
-  };
-
-  const refreshAdminData = () => {
-    return Promise.all([
-      http.get("/admin/overview").then(({ data }) => setMetrics(data.metrics)).catch(() => {}),
-      http.get("/admin/pending-approvals").then(({ data }) => {
-        setPendingUsers(data.pendingUsers);
-        setPendingArticles(data.pendingArticles);
-      }).catch(() => {}),
-      http.get("/users?roles=reporter,chief_editor").then(({ data }) => setManagedUsers(data.users)).catch(() => {}),
-      http.get("/ads").then(({ data }) => setAds(data.ads)).catch(() => {}),
-      http.get("/contact").then(({ data }) => setContactMessages(data.messages)).catch(() => {}),
-    ]);
   };
 
   const syncManagedUserState = (updatedUser) => {
@@ -571,23 +622,10 @@ export const DashboardPage = () => {
     if (!user) return;
 
     refreshProfile();
+    refreshDashboardPayload();
 
-    if (user.role === "reporter" || user.role === "chief_editor" || user.role === "super_admin") {
-      refreshMyArticles();
-      if (user.role === "reporter" || user.role === "chief_editor") {
-        http.get("/users/id-card").then(({ data }) => setReporterCardUrl(data.idCardUrl)).catch(() => {});
-      }
-    }
-
-    if (user.role === "super_admin") {
-      refreshAdminData();
-      refreshPublishedArchive();
-    }
-
-    if (user.role === "chief_editor") {
-      refreshChiefMetrics();
-      refreshEditorialQueue();
-      refreshPublishedArchive();
+    if (user.role === "reporter" || user.role === "chief_editor") {
+      http.get("/users/id-card").then(({ data }) => setReporterCardUrl(data.idCardUrl)).catch(() => {});
     }
   }, [user]);
 
@@ -638,6 +676,7 @@ export const DashboardPage = () => {
   const resetArticleForm = () => {
     setArticleForm(initialArticleForm);
     setEditingArticleId("");
+    setArticleErrors({});
   };
 
   const resetAdForm = () => {
@@ -670,32 +709,20 @@ export const DashboardPage = () => {
   };
 
   const openCredentialForm = () => {
-    setShowCredentialForm(true);
-    setTimeout(() => {
-      document.getElementById("account-credentials-panel")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 0);
+    setActiveTab("credentials");
   };
 
   const closeCredentialForm = () => {
-    setShowCredentialForm(false);
+    setActiveTab("overview");
     resetCredentialForm();
   };
 
   const openReporterDesk = () => {
-    setShowReporterDesk(true);
-    setTimeout(() => {
-      document.getElementById("reporter-desk-panel")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 0);
+    setActiveTab("write_news");
   };
 
   const closeReporterDesk = () => {
-    setShowReporterDesk(false);
+    setActiveTab("overview");
     resetArticleForm();
   };
 
@@ -709,6 +736,38 @@ export const DashboardPage = () => {
 
   const submitArticle = async (event) => {
     event.preventDefault();
+
+    const errors = {};
+    if (!String(articleForm.title || "").trim()) {
+      errors.title = true;
+    }
+    if (!String(articleForm.district || "").trim()) {
+      errors.district = true;
+    }
+    if (articleBlocks.length > 0 && !String(articleForm.area || "").trim()) {
+      errors.area = true;
+    }
+    if (!String(articleForm.excerpt || "").trim()) {
+      errors.excerpt = true;
+    }
+    if (!String(articleForm.content || "").trim()) {
+      errors.content = true;
+    }
+    if (!String(articleForm.coverImageUrl || "").trim()) {
+      errors.coverImageUrl = true;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setArticleErrors(errors);
+      setActionPopup({
+        type: "error",
+        title: "Submission Blocked",
+        message: "Please fill out all the highlighted article fields correctly, including the headline, jurisdiction district/block, short excerpt, full news content, and cover image scan, before submitting.",
+      });
+      return;
+    }
+
+    setArticleErrors({});
     await handleAction(async () => {
       if (editingArticleId) {
         await http.patch(`/articles/${editingArticleId}`, articleForm);
@@ -728,6 +787,7 @@ export const DashboardPage = () => {
         refreshAdminData();
         refreshPublishedArchive();
       }
+      setActiveTab("my_stories");
     }, editingArticleId
       ? user?.role === "chief_editor"
         ? "Published article updated successfully."
@@ -769,14 +829,16 @@ export const DashboardPage = () => {
   };
 
   const startEditArticle = (article) => {
-    setShowReporterDesk(true);
+    setActiveTab("write_news");
     setEditingArticleId(article._id);
+    setArticleErrors({});
     setArticleForm({
       title: article.title,
       excerpt: article.excerpt,
       content: article.content,
       district: article.district,
       area: article.area,
+      panchayat: article.panchayat || "",
       breaking: article.breaking,
       coverImageUrl: article.coverImageUrl || "",
       audioUrl: article.audioUrl || "",
@@ -784,13 +846,6 @@ export const DashboardPage = () => {
       audioWaveform: article.audioWaveform || [],
       audioTranscript: article.audioTranscript || "",
     });
-    window.setTimeout(() => {
-      document.getElementById("reporter-desk-panel")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-      document.getElementById("article-headline-input")?.focus();
-    }, 120);
   };
 
   const deleteArticle = async (articleId) => {
@@ -858,7 +913,6 @@ export const DashboardPage = () => {
   };
 
   const startEditAd = (ad) => {
-    setShowAdRequestsPanel(false);
     setEditingAdId(ad._id);
     setAdForm({
       advertiserName: ad.advertiserName || "",
@@ -877,23 +931,10 @@ export const DashboardPage = () => {
       notes: ad.notes || "",
       status: ad.status || "active",
     });
-    setTimeout(() => {
-      document.getElementById("advertisement-management-form")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-      document.getElementById("advertisement-title-input")?.focus();
-    }, 120);
   };
 
   const focusManageAdsSection = () => {
-    setShowAdRequestsPanel(false);
-    setTimeout(() => {
-      document.getElementById("advertisement-management-form")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 0);
+    setActiveTab("ad_desk");
   };
 
   const deleteAd = async (adId) => {
@@ -937,13 +978,10 @@ export const DashboardPage = () => {
       profilePhotoUrl: managedUser.profilePhotoUrl || "",
       aadhaarImageUrl: managedUser.aadhaarImageUrl || "",
       livePhotoUrl: managedUser.livePhotoUrl || "",
+      validUpto: managedUser.validUpto || "",
+      bloodGroup: managedUser.bloodGroup || "O+",
+      education: managedUser.education || "",
     });
-    setTimeout(() => {
-      document.getElementById(`managed-user-${managedUser._id}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 0);
   };
 
   const saveManagedUser = async (userId) => {
@@ -988,12 +1026,6 @@ export const DashboardPage = () => {
       status: contactMessage.status || "new",
       adminNote: contactMessage.adminNote || "",
     });
-    setTimeout(() => {
-      document.getElementById(`contact-message-${contactMessage._id}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 0);
   };
 
   const saveContactMessage = async (contactId) => {
@@ -1058,6 +1090,46 @@ export const DashboardPage = () => {
         refreshChiefMetrics();
       }
     }, "Article rejected with editorial feedback.");
+  };
+
+  const saveGlobalExpiry = async (event) => {
+    event.preventDefault();
+    if (!globalExpiryForm) {
+      setActionPopup({
+        type: "error",
+        title: "Date Required",
+        message: "Please choose a valid global accreditation expiry date before clicking Save.",
+      });
+      return;
+    }
+
+    await handleAction(async () => {
+      const { data } = await http.patch("/admin/settings", { globalIdCardExpiry: globalExpiryForm });
+      setGlobalIdCardExpiry(data.globalIdCardExpiry);
+      setGlobalExpiryForm(data.globalIdCardExpiry);
+      
+      if (dashboardCache) {
+        dashboardCache.globalIdCardExpiry = data.globalIdCardExpiry;
+      }
+      
+      await refreshAdminData();
+    }, "Global ID card expiry date updated successfully.");
+  };
+
+  const clearGlobalExpiry = async () => {
+    if (!window.confirm("Are you sure you want to remove the global expiry date? System will fall back to rolling 1-year calculations.")) return;
+
+    await handleAction(async () => {
+      const { data } = await http.patch("/admin/settings", { globalIdCardExpiry: "" });
+      setGlobalIdCardExpiry("");
+      setGlobalExpiryForm("");
+      
+      if (dashboardCache) {
+        dashboardCache.globalIdCardExpiry = "";
+      }
+      
+      await refreshAdminData();
+    }, "Global ID card expiry date removed successfully.");
   };
 
   const deletePublishedArticlesForDate = async () => {
@@ -1237,8 +1309,1166 @@ export const DashboardPage = () => {
     }
   };
 
+  // ----------------------------------------------------
+  // SUB-RENDER WORKSPACE VIEWS
+  // ----------------------------------------------------
+
+  const renderOverview = () => {
+    return (
+      <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-orange-400">Workspace Overview</p>
+          <h1 className="mt-2 font-display text-3xl font-bold text-white md:text-4xl">
+            Welcome back, {profile?.fullName || user?.fullName || "Journalist"}
+          </h1>
+          <p className="mt-2 text-sm text-slate-400">Here is your customized editorial briefing, metrics, and verification records.</p>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card) => (
+            <MetricCard key={card.label} {...card} />
+          ))}
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Profile Details Card */}
+          <div className="panel p-6 border border-white/5 bg-slate-900/10">
+            <h3 className="text-lg font-bold text-white border-b border-white/5 pb-3 flex items-center gap-2">
+              <UserCheck size={18} className="text-orange-400" />
+              {user?.role === "super_admin" ? "Super Admin Account" : user?.role === "chief_editor" ? "Chief Editor Credentials" : "Reporter Credentials"}
+            </h3>
+            {profile ? (
+              <div className="mt-4 space-y-1">
+                <DetailRow label="Role" value={String(profile.role || "-").replaceAll("_", " ")} />
+                <DetailRow label="Approval Status" value={profile.approvalStatus || "-"} />
+                <DetailRow label="Phone Verified" value={profile.isPhoneVerified ? "Yes" : "No"} />
+                <DetailRow label="Phone" value={profile.phone || "-"} />
+                <DetailRow label="Email" value={profile.email || "-"} />
+                <DetailRow label="Joined On" value={formatDate(profile.createdAt)} />
+                {(user?.role === "reporter" || user?.role === "chief_editor") && (
+                  <>
+                    <DetailRow label="District" value={profile.district || "-"} />
+                    <DetailRow label="Area / Block" value={profile.area || "-"} />
+                    <DetailRow label="Blood Group" value={profile.bloodGroup || "-"} />
+                    <DetailRow label="Education" value={profile.education || "-"} />
+                    <DetailRow 
+                      label="ID Expiry Date" 
+                      value={profile.validUpto 
+                        ? new Date(profile.validUpto).toLocaleDateString() 
+                        : globalIdCardExpiry 
+                          ? `${new Date(globalIdCardExpiry).toLocaleDateString()} (Global)` 
+                          : "Permanent / Auto-Renewal"} 
+                    />
+                  </>
+                )}
+                {user?.role === "reporter" && <DetailRow label="Reporter Code" value={profile.reporterCode || "Not generated yet"} />}
+                {user?.role === "chief_editor" && <DetailRow label="Chief Editor Code" value={profile.chiefEditorCode || "Not generated yet"} />}
+                {profile.rejectionFeedback && <DetailRow label="Admin Feedback" value={profile.rejectionFeedback} valueClassName="text-right text-rose-300" />}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">Loading profile data...</p>
+            )}
+          </div>
+
+          {/* Desk Notes Card */}
+          <div className="panel p-6 border border-white/5 bg-slate-900/10">
+            <h3 className="text-lg font-bold text-white border-b border-white/5 pb-3 flex items-center gap-2">
+              <BookOpen size={18} className="text-orange-400" />
+              {user?.role === "super_admin" ? "Admin Access Notes" : "Desk Access Notes"}
+            </h3>
+            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-400">
+              {user?.role === "super_admin" ? (
+                <>
+                  <p>Your dashboard controls reporter approvals, story publishing, advertisement priority, and overall homepage sponsor visibility.</p>
+                  <p>Higher priority ads appear earlier in each homepage placement. Use small numbers like 1, 2, and 3 for your most important campaigns.</p>
+                  <p>When an ad is marked active, it becomes eligible for homepage display until its duration window ends.</p>
+                </>
+              ) : user?.role === "chief_editor" ? (
+                <>
+                  <p>Your chief editor desk opens after approval, phone verification, and active newsroom access. Super admin can temporarily disable these actions when needed.</p>
+                  <p>Use the editorial queue to publish strong reports quickly or send revision feedback back to the reporter desk.</p>
+                  <p>Your dashboard also shows live newsroom metrics so you can monitor pending and published coverage.</p>
+                </>
+              ) : (
+                <>
+                  <p>Your reporter desk opens after approval, phone verification, and active newsroom access. Super admin can temporarily disable these actions when needed.</p>
+                  <p>Use the excerpt field for a concise summary and the full content field for the complete report copy.</p>
+                  <p>Approved reporters also receive a generated reporter ID card link directly inside this dashboard.</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ID Card Preview Block */}
+          {showReporterCardAction && (
+            <div className="lg:col-span-1">
+              <IDCardPreview profile={profile} cardUrl={reporterCardUrl} globalIdCardExpiry={globalIdCardExpiry} />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderWriteNews = () => {
+    return (
+      <div id="reporter-desk-panel" className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
+        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Content Composer</p>
+            <h2 className="text-2xl font-bold text-white mt-1">
+              {user?.role === "super_admin" ? "Super Admin News Desk" : user?.role === "chief_editor" ? "Chief Editor Desk" : "Reporter Desk"}
+            </h2>
+          </div>
+          {editingArticleId ? (
+            <button type="button" onClick={resetArticleForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/5 transition">
+              Cancel Edit
+            </button>
+          ) : null}
+        </div>
+
+        {!canAccessNewsDesk ? (
+          <div className="mt-6 flex flex-col items-center justify-center p-8 text-center border border-dashed border-white/10 rounded-2xl">
+            <Lock size={36} className="text-slate-500 mb-3" />
+            <p className="text-slate-400 text-sm max-w-md">
+              {isFunctionalityDisabled
+                ? "Your newsroom actions are currently disabled by the super admin. Article publishing and review tools are temporarily unavailable."
+                : "Your news desk unlocks after super admin approval and phone verification."}
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={submitArticle} className="mt-5 grid gap-4 md:grid-cols-2">
+            <input
+              id="article-headline-input"
+              className={`rounded-2xl border px-4 py-3 text-white md:col-span-2 transition-all duration-300 outline-none ${
+                articleErrors.title
+                  ? "bg-red-500/[0.07] border-white/10 shadow-[0_0_20px_rgba(239,68,68,0.06)]"
+                  : "bg-white/5 border-white/10 focus:border-orange-500/80 focus:ring-4 focus:ring-orange-500/10"
+              }`}
+              placeholder="Headline"
+              value={articleForm.title}
+              onChange={(event) => {
+                setArticleForm({ ...articleForm, title: event.target.value });
+                if (articleErrors.title) setArticleErrors({ ...articleErrors, title: false });
+              }}
+            />
+            <select
+              className={`rounded-2xl border px-4 py-3 text-white transition-all duration-300 outline-none ${
+                articleErrors.district
+                  ? "bg-red-500/[0.07] border-white/10 shadow-[0_0_20px_rgba(239,68,68,0.06)]"
+                  : "bg-slate-900 border-white/10 focus:border-orange-500/80 focus:ring-4 focus:ring-orange-500/10"
+              }`}
+              value={articleForm.district}
+              onChange={(event) => {
+                setArticleForm({ ...articleForm, district: event.target.value, area: "" });
+                if (articleErrors.district) setArticleErrors({ ...articleErrors, district: false });
+              }}
+            >
+              <option value="">Select district</option>
+              {jharkhandDistricts.map((district) => (
+                <option key={district} value={district}>{district}</option>
+              ))}
+            </select>
+            <select
+              className={`rounded-2xl border px-4 py-3 text-white transition-all duration-300 outline-none ${
+                articleErrors.area
+                  ? "bg-red-500/[0.07] border-white/10 shadow-[0_0_20px_rgba(239,68,68,0.06)]"
+                  : "bg-slate-900 border-white/10 focus:border-orange-500/80 focus:ring-4 focus:ring-orange-500/10"
+              }`}
+              disabled={!articleForm.district}
+              value={articleForm.area}
+              onChange={(event) => {
+                setArticleForm({ ...articleForm, area: event.target.value });
+                if (articleErrors.area) setArticleErrors({ ...articleErrors, area: false });
+              }}
+            >
+              <option value="">Select block</option>
+              {articleBlocks.map((block) => (
+                <option key={block} value={block}>{block}</option>
+              ))}
+            </select>
+            <input
+              className="rounded-2xl border bg-white/5 px-4 py-3 text-white transition-all duration-300 outline-none border-white/10 focus:border-orange-500/80 focus:ring-4 focus:ring-orange-500/10 md:col-span-2"
+              placeholder="Panchayat / Local Area (Optional)"
+              value={articleForm.panchayat}
+              onChange={(event) => setArticleForm({ ...articleForm, panchayat: event.target.value })}
+            />
+            <textarea
+              className={`rounded-2xl border px-4 py-3 text-white md:col-span-2 transition-all duration-300 outline-none ${
+                articleErrors.excerpt
+                  ? "bg-red-500/[0.07] border-white/10 shadow-[0_0_20px_rgba(239,68,68,0.06)]"
+                  : "bg-white/5 border-white/10 focus:border-orange-500/80 focus:ring-4 focus:ring-orange-500/10"
+              }`}
+              rows="3"
+              placeholder="Short excerpt"
+              value={articleForm.excerpt}
+              onChange={(event) => {
+                setArticleForm({ ...articleForm, excerpt: event.target.value });
+                if (articleErrors.excerpt) setArticleErrors({ ...articleErrors, excerpt: false });
+              }}
+            />
+            <textarea
+              className={`rounded-2xl border px-4 py-3 text-white md:col-span-2 transition-all duration-300 outline-none ${
+                articleErrors.content
+                  ? "bg-red-500/[0.07] border-white/10 shadow-[0_0_20px_rgba(239,68,68,0.06)]"
+                  : "bg-white/5 border-white/10 focus:border-orange-500/80 focus:ring-4 focus:ring-orange-500/10"
+              }`}
+              rows="8"
+              placeholder="Full article content"
+              value={articleForm.content}
+              onChange={(event) => {
+                setArticleForm({ ...articleForm, content: event.target.value });
+                if (articleErrors.content) setArticleErrors({ ...articleErrors, content: false });
+              }}
+            />
+            <div className="md:col-span-2">
+              <div className={`rounded-2xl p-0.5 transition-all duration-300 ${
+                articleErrors.coverImageUrl
+                  ? "bg-red-500/[0.04] shadow-[0_0_25px_rgba(239,68,68,0.08)] border border-white/5"
+                  : ""
+              }`}>
+                <ImagePicker
+                  label="Article Cover Image"
+                  helpText="Upload a strong visual to make the story look professional on cards and article pages."
+                  value={articleForm.coverImageUrl}
+                  onChange={(value) => {
+                    setArticleForm({ ...articleForm, coverImageUrl: value });
+                    if (articleErrors.coverImageUrl) setArticleErrors({ ...articleErrors, coverImageUrl: false });
+                  }}
+                />
+              </div>
+            </div>
+            <label className="flex items-center gap-3 text-sm text-slate-500 md:col-span-2">
+              <input type="checkbox" checked={articleForm.breaking} onChange={(event) => setArticleForm({ ...articleForm, breaking: event.target.checked })} />
+              Mark as breaking news
+            </label>
+            <button
+              type="submit"
+              disabled={Boolean(busyAction)}
+              className="rounded-2xl bg-orange-500 hover:bg-orange-400 disabled:bg-orange-500/20 disabled:text-white/40 disabled:cursor-not-allowed transition-all duration-300 px-4 py-3 font-semibold text-white md:col-span-2 shadow-lg"
+            >
+              {busyAction ? "Saving..." : editingArticleId ? "Update Article" : user?.role === "super_admin" ? "Publish News" : "Submit News"}
+            </button>
+          </form>
+        )}
+      </div>
+    );
+  };
+
+  const renderMyStories = () => {
+    return (
+      <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
+        {user?.role !== "reporter" && (
+          <PublishedArchiveSection
+            selectedDate={publishedArchiveDate}
+            onDateChange={setPublishedArchiveDate}
+            articles={publishedArchiveArticles}
+            onRefresh={() => refreshPublishedArchive()}
+            onDelete={requestPublishedArchiveDelete}
+            busy={archiveBusy}
+            onEditArticle={startEditArticle}
+            onDeleteArticle={(article) => setPendingArchiveArticleDelete(article)}
+            onCopyLink={copyArticleLink}
+            onOpenArticle={openArticleFromDashboard}
+          />
+        )}
+
+        <div className="panel p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Content Library</p>
+              <h2 className="text-2xl font-bold text-white mt-1">My Articles</h2>
+            </div>
+            <select
+              className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none"
+              value={articleStatusFilter}
+              onChange={(event) => {
+                setArticleStatusFilter(event.target.value);
+                setArticlePage(1);
+              }}
+            >
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+              <option value="published">Published</option>
+            </select>
+          </div>
+          <div className="mt-5 space-y-4">
+            {pagedArticles.map((article) => (
+              <div
+                key={article._id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openArticleFromDashboard(article)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openArticleFromDashboard(article);
+                  }
+                }}
+                className="cursor-pointer rounded-2xl border border-white/10 p-4 transition hover:border-white/20 hover:bg-white/[0.03]"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold text-white">{article.title}</p>
+                    <p className="text-sm text-slate-500">By {getArticleAuthorName(article)}</p>
+                    <p className="text-sm text-slate-500">Published: {getArticlePublishedLabel(article)}</p>
+                    <p className="text-sm text-slate-500">Views: {getArticleViews(article)}</p>
+                    <p className="text-sm text-slate-500">{joinMetaParts(article.district, article.area, article.panchayat, article.status)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {article.audioUrl ? (
+                      <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
+                    ) : null}
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
+                  </div>
+                </div>
+                {article.editorFeedback ? <p className="mt-3 text-sm text-rose-300">Feedback: {article.editorFeedback}</p> : null}
+                {article.coverImageUrl ? (
+                  <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
+                    <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" />
+                  </div>
+                ) : null}
+                {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button type="button" onClick={(event) => {
+                    event.stopPropagation();
+                    copyArticleLink(article);
+                  }} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/5 transition">
+                    Copy Link
+                  </button>
+                </div>
+                {article.status !== "published" ? (
+                  <div className="mt-4 flex gap-3">
+                    {!article.audioUrl ? (
+                      <button type="button" onClick={(event) => {
+                        event.stopPropagation();
+                        startEditArticle(article);
+                      }} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition">
+                        Edit
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={(event) => {
+                      event.stopPropagation();
+                      deleteArticle(article._id);
+                    }} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
+                {article.audioUrl && article.status !== "published" ? (
+                  <p className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+                    Voice submissions can be re-recorded from the floating voice desk before resubmitting.
+                  </p>
+                ) : null}
+              </div>
+            ))}
+            {!pagedArticles.length ? (
+              <p className="text-slate-500 py-4 text-center">No articles are available in this status.</p>
+            ) : null}
+          </div>
+          {filteredArticles.length > 4 ? (
+            <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4">
+              <button type="button" disabled={articlePage === 1} onClick={() => setArticlePage((value) => Math.max(1, value - 1))} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white disabled:opacity-40 hover:bg-white/5 transition">
+                Previous
+              </button>
+              <span className="text-sm text-slate-500">Page {articlePage} of {totalArticlePages}</span>
+              <button type="button" disabled={articlePage === totalArticlePages} onClick={() => setArticlePage((value) => Math.min(totalArticlePages, value + 1))} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white disabled:opacity-40 hover:bg-white/5 transition">
+                Next
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
+  const renderApprovals = () => {
+    return (
+      <div className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
+        <div className="border-b border-white/5 pb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Onboarding Verification Queue</p>
+          <h2 className="text-2xl font-bold text-white mt-1">Reporter Approvals</h2>
+        </div>
+        <input className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Search pending reporters" value={pendingUserSearch} onChange={(event) => setPendingUserSearch(event.target.value)} />
+        <div className="mt-5 space-y-4">
+          {visiblePendingUsers.map((pendingUser) => (
+            <div key={pendingUser._id} className="rounded-2xl border border-white/10 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold text-white">{pendingUser.fullName}</p>
+                  <p className="text-sm text-slate-500">{joinMetaParts(pendingUser.phone, pendingUser.district, pendingUser.area)}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => approveUser(pendingUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 transition">Approve</button>
+                  <button type="button" onClick={() => rejectUser(pendingUser._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">Reject</button>
+                </div>
+              </div>
+              <input className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Optional rejection feedback" value={feedbacks[`user-${pendingUser._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`user-${pendingUser._id}`]: event.target.value })} />
+            </div>
+          ))}
+          {!visiblePendingUsers.length ? <p className="text-slate-500 py-4 text-center">No reporter approvals match your search.</p> : null}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDirectory = () => {
+    return (
+      <div className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
+        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Platform Users</p>
+            <h2 className="text-2xl font-bold text-white mt-1">Manage Reporters And Chief Editors</h2>
+          </div>
+          {editingManagedUserId ? (
+            <button type="button" onClick={resetManagedUserForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/5 transition">
+              Cancel Edit
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px]">
+          <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Search all registered reporters and chief editors" value={managedUserSearch} onChange={(event) => setManagedUserSearch(event.target.value)} />
+          <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none" value={managedUserStatusFilter} onChange={(event) => setManagedUserStatusFilter(event.target.value)}>
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div className="mt-5 space-y-4">
+          {visibleManagedUsers.map((managedUser) => (
+            <div id={`managed-user-${managedUser._id}`} key={managedUser._id} className="rounded-2xl border border-white/10 p-4">
+              {editingManagedUserId === managedUser._id ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {managedUserForm.role === "reporter" ? (
+                    <>
+                      <div className="md:col-span-1">
+                        <ManagedImagePreview
+                          title="Profile Photo"
+                          src={managedUserForm.profilePhotoUrl}
+                          alt={managedUserForm.fullName || "Profile preview"}
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <ManagedImagePreview
+                          title="Aadhaar Photo"
+                          src={managedUserForm.aadhaarImageUrl}
+                          alt={managedUserForm.fullName || "Aadhaar preview"}
+                        />
+                      </div>
+                    </>
+                  ) : null}
+                  {managedUserForm.role === "chief_editor" ? (
+                    <div className="md:col-span-2">
+                      <ManagedImagePreview
+                        title="Live Photo"
+                        src={managedUserForm.livePhotoUrl}
+                        alt={managedUserForm.fullName || "Live photo preview"}
+                      />
+                    </div>
+                  ) : null}
+                  {managedUserForm.role === "reporter" ? (
+                    <>
+                      <div className="md:col-span-2">
+                        <ImagePicker
+                          label="Reupload Profile Photo"
+                          helpText="Replace the current reporter profile image if the existing file needs correction."
+                          value={managedUserForm.profilePhotoUrl}
+                          onChange={(value) => setManagedUserForm({ ...managedUserForm, profilePhotoUrl: value })}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <ImagePicker
+                          label="Reupload Aadhaar Photo"
+                          helpText="Replace the Aadhaar image for KYC correction or better clarity."
+                          value={managedUserForm.aadhaarImageUrl}
+                          onChange={(value) => setManagedUserForm({ ...managedUserForm, aadhaarImageUrl: value })}
+                        />
+                      </div>
+                    </>
+                  ) : null}
+                  {managedUserForm.role === "chief_editor" ? (
+                    <div className="md:col-span-2">
+                      <WebcamCapture
+                        value={managedUserForm.livePhotoUrl}
+                        onCapture={(value) => setManagedUserForm({ ...managedUserForm, livePhotoUrl: value })}
+                      />
+                    </div>
+                  ) : null}
+                  <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" value={managedUserForm.fullName} onChange={(event) => setManagedUserForm({ ...managedUserForm, fullName: event.target.value })} placeholder="Full name" />
+                  <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" value={managedUserForm.email} onChange={(event) => setManagedUserForm({ ...managedUserForm, email: event.target.value })} placeholder="Email" />
+                  <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" value={managedUserForm.phone} onChange={(event) => setManagedUserForm({ ...managedUserForm, phone: event.target.value })} placeholder="Phone" />
+                  <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none" value={managedUserForm.role} onChange={(event) => setManagedUserForm({ ...managedUserForm, role: event.target.value })}>
+                    {managedRoleOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" value={managedUserForm.district} onChange={(event) => setManagedUserForm({ ...managedUserForm, district: event.target.value })} placeholder="District" />
+                  <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" value={managedUserForm.area} onChange={(event) => setManagedUserForm({ ...managedUserForm, area: event.target.value })} placeholder="Area / Block" />
+                  <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none" value={managedUserForm.approvalStatus} onChange={(event) => setManagedUserForm({ ...managedUserForm, approvalStatus: event.target.value })}>
+                    {approvalOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase pl-1 tracking-wider">Valid Upto Expiry Date</span>
+                    <input 
+                      type="date" 
+                      className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:ring-0 focus:outline-none" 
+                      value={managedUserForm.validUpto ? managedUserForm.validUpto.slice(0, 10) : ""} 
+                      onChange={(event) => setManagedUserForm({ ...managedUserForm, validUpto: event.target.value })} 
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase pl-1 tracking-wider">Blood Group</span>
+                    <select 
+                      className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:ring-0 focus:outline-none" 
+                      value={managedUserForm.bloodGroup || "O+"} 
+                      onChange={(event) => setManagedUserForm({ ...managedUserForm, bloodGroup: event.target.value })}
+                    >
+                      {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(bg => (
+                        <option key={bg} value={bg}>{bg}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1 sm:col-span-2">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase pl-1 tracking-wider">Educational Qualification</span>
+                    <input 
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:ring-0 focus:outline-none" 
+                      value={managedUserForm.education || ""} 
+                      onChange={(event) => setManagedUserForm({ ...managedUserForm, education: event.target.value })} 
+                      placeholder="Educational details (e.g. Graduate, Postgraduate)" 
+                    />
+                  </div>
+                  <label className="flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-400">
+                    <input type="checkbox" checked={managedUserForm.isPhoneVerified} onChange={(event) => setManagedUserForm({ ...managedUserForm, isPhoneVerified: event.target.checked })} />
+                    Phone verified
+                  </label>
+                  <label className="flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={managedUserForm.isFunctionalityDisabled}
+                      onChange={(event) => setManagedUserForm({ ...managedUserForm, isFunctionalityDisabled: event.target.checked })}
+                    />
+                    Disable all newsroom actions
+                  </label>
+                  <div className="flex gap-3 md:col-span-2 border-t border-white/5 pt-4">
+                    <button type="button" onClick={() => saveManagedUser(managedUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 transition">Save</button>
+                    <button type="button" onClick={() => setPendingManagedUserDelete(managedUser)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">Delete</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-white">{managedUser.fullName}</p>
+                    <p className="text-sm text-slate-500">{managedUser.phone} • {managedUser.email || "-"}</p>
+                    <p className="text-sm text-slate-500">
+                       {managedUser.district || "-"} • {managedUser.area || "-"}
+                       {managedUser.bloodGroup ? ` • Blood: ${managedUser.bloodGroup}` : ""}
+                       {managedUser.education ? ` • Edu: ${managedUser.education}` : ""}
+                       {managedUser.validUpto 
+                         ? ` • Expiry: ${new Date(managedUser.validUpto).toLocaleDateString()}` 
+                         : globalIdCardExpiry 
+                           ? ` • Expiry: ${new Date(globalIdCardExpiry).toLocaleDateString()} (Global)` 
+                           : " • Expiry: Permanent / Auto-Renewal"}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{String(managedUser.role || "").replaceAll("_", " ")}</span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                          managedUser.approvalStatus === "approved"
+                            ? "bg-green-500/15 text-green-300"
+                            : managedUser.approvalStatus === "pending"
+                              ? "bg-yellow-500/15 text-yellow-300"
+                              : "bg-rose-500/15 text-rose-300"
+                        }`}
+                      >
+                        {managedUser.approvalStatus}
+                      </span>
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">{managedUser.isPhoneVerified ? "Phone Verified" : "Phone Pending"}</span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                          managedUser.isFunctionalityDisabled ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300"
+                        }`}
+                      >
+                        {managedUser.isFunctionalityDisabled ? "Actions Disabled" : "Actions Enabled"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {managedUser.approvalStatus === "pending" ? <button type="button" onClick={() => approveUser(managedUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 transition">Approve</button> : null}
+                    <button type="button" onClick={() => startEditManagedUser(managedUser)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition">Edit</button>
+                    <button type="button" onClick={() => setPendingManagedUserDelete(managedUser)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">Delete</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {!visibleManagedUsers.length ? <p className="text-slate-500 py-4 text-center">No registered reporters or chief editors match your search.</p> : null}
+        </div>
+      </div>
+    );
+  };
+
+  const renderQueue = () => {
+    return (
+      <div className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
+        <div className="border-b border-white/5 pb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Editorial Review Queue</p>
+          <h2 className="text-2xl font-bold text-white mt-1">News Publishing Queue</h2>
+        </div>
+        <input className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Search pending stories" value={pendingArticleSearch} onChange={(event) => setPendingArticleSearch(event.target.value)} />
+        <div className="mt-5 space-y-4">
+          {visiblePendingArticles.map((article) => (
+            <div key={article._id} className="rounded-2xl border border-white/10 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <p className="text-lg font-semibold text-white">{article.title}</p>
+                <div className="flex flex-wrap gap-2">
+                  {article.audioUrl ? (
+                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
+                  ) : null}
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
+                </div>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">By {joinMetaParts(article.author?.fullName, article.district, article.area)}</p>
+              <p className="mt-3 text-sm text-slate-400">{article.excerpt}</p>
+              {article.coverImageUrl ? (
+                <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
+                  <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" />
+                </div>
+              ) : null}
+              {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
+              <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" rows="2" placeholder="Editorial feedback for rejection" value={feedbacks[`article-${article._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`article-${article._id}`]: event.target.value })} />
+              <div className="mt-4 flex gap-3">
+                <button type="button" onClick={() => approveArticle(article._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 transition">Publish</button>
+                <button type="button" onClick={() => rejectArticle(article._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">Reject</button>
+              </div>
+            </div>
+          ))}
+          {!visiblePendingArticles.length ? <p className="text-slate-500 py-4 text-center">No pending stories match your search.</p> : null}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdDesk = () => {
+    return (
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr] animate-[fadeIn_0.4s_ease-out]">
+        <div id="advertisement-management-form" className="panel p-6 border border-white/5 bg-slate-900/10 h-fit">
+          <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Marketing Desk</p>
+              <h2 className="text-2xl font-bold text-white mt-1">Advertisement Management</h2>
+            </div>
+            {editingAdId ? (
+              <button type="button" onClick={resetAdForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/5 transition">
+                Cancel Edit
+              </button>
+            ) : null}
+          </div>
+          <form onSubmit={submitAd} className="mt-5 grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Advertiser name" value={adForm.advertiserName} onChange={(event) => setAdForm({ ...adForm, advertiserName: event.target.value })} />
+              <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Advertiser email" value={adForm.advertiserEmail} onChange={(event) => setAdForm({ ...adForm, advertiserEmail: event.target.value })} />
+              <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Advertiser phone" value={adForm.advertiserPhone} onChange={(event) => setAdForm({ ...adForm, advertiserPhone: event.target.value })} />
+              <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Company or brand name" value={adForm.companyName} onChange={(event) => setAdForm({ ...adForm, companyName: event.target.value })} />
+            </div>
+            <div>
+              <input id="advertisement-title-input" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Campaign title, for example Palamu Trade Fair 2026" value={adForm.title} onChange={(event) => setAdForm({ ...adForm, title: event.target.value })} />
+              <p className="mt-2 text-xs text-slate-500">Use a short sponsor title that is easy to recognize on the homepage.</p>
+            </div>
+            <div>
+              <textarea className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" rows="3" placeholder="Optional short sponsor summary for homepage cards" value={adForm.description} onChange={(event) => setAdForm({ ...adForm, description: event.target.value })} />
+              <p className="mt-2 text-xs text-slate-500">Keep this to one or two lines so the sponsored panel stays clean and readable.</p>
+            </div>
+            <ImagePicker
+              label="Advertisement Banner Upload"
+              helpText="Upload a sponsor banner here, or leave this empty and paste a direct banner image URL below."
+              value={adForm.imageUrl}
+              onChange={(value) => setAdForm({ ...adForm, imageUrl: value })}
+            />
+            <div>
+              <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Optional banner URL, for example https://example.com/banner.jpg" value={adForm.imageUrl.startsWith("data:") ? "" : adForm.imageUrl} onChange={(event) => setAdForm({ ...adForm, imageUrl: event.target.value })} />
+              <p className="mt-2 text-xs text-slate-500">Use this when the sponsor already hosts the banner online. Upload and URL are interchangeable; one banner source is enough.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <input type="url" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Sponsor destination URL, for example https://example.com/offer" value={adForm.targetUrl} onChange={(event) => setAdForm({ ...adForm, targetUrl: event.target.value })} />
+                <p className="mt-2 text-xs text-slate-500">Readers are taken here after clicking the ad.</p>
+              </div>
+              <div>
+                <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="CTA label, for example View Offer" value={adForm.ctaLabel} onChange={(event) => setAdForm({ ...adForm, ctaLabel: event.target.value })} />
+                <p className="mt-2 text-xs text-slate-500">Short button text works best.</p>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <select className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none" value={adForm.placement} onChange={(event) => setAdForm({ ...adForm, placement: event.target.value })}>
+                  {adPlacements.map((placement) => (
+                    <option key={placement.value} value={placement.value}>
+                      {placement.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">{selectedPlacement?.hint}</p>
+              </div>
+              <div>
+                <select className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none" value={adForm.status} onChange={(event) => setAdForm({ ...adForm, status: event.target.value })}>
+                  {adStatuses.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">Use Pending Approval for paid requests waiting on review, or Active to publish immediately.</p>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <input type="number" min="1" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Duration in days" value={adForm.durationDays} onChange={(event) => setAdForm({ ...adForm, durationDays: Number(event.target.value) })} />
+                <p className="mt-2 text-xs text-slate-500">How long the ad should stay active once published.</p>
+              </div>
+              <div>
+                <input type="number" min="0" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Price in INR" value={adForm.amount} onChange={(event) => setAdForm({ ...adForm, amount: Number(event.target.value) })} />
+                <p className="mt-2 text-xs text-slate-500">Internal campaign price or billing amount.</p>
+              </div>
+              <div>
+                <input type="number" min="1" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Priority, lower means higher" value={adForm.priority} onChange={(event) => setAdForm({ ...adForm, priority: Number(event.target.value) })} />
+                <p className="mt-2 text-xs text-slate-500">Priority decides ordering inside the selected homepage placement.</p>
+              </div>
+            </div>
+            <div>
+              <textarea className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" rows="3" placeholder="Optional internal notes or advertiser remarks" value={adForm.notes} onChange={(event) => setAdForm({ ...adForm, notes: event.target.value })} />
+              <p className="mt-2 text-xs text-slate-500">Useful for approval notes, invoice references, or campaign instructions.</p>
+            </div>
+            <button
+               type="submit"
+               disabled={Boolean(busyAction)}
+               className="rounded-2xl bg-orange-500 hover:bg-orange-400 disabled:bg-orange-500/20 disabled:text-white/40 disabled:cursor-not-allowed transition-all duration-300 px-4 py-3 font-semibold text-white shadow-lg"
+             >
+               {busyAction ? "Saving..." : editingAdId ? "Update Advertisement" : "Publish Advertisement"}
+             </button>
+          </form>
+        </div>
+
+        <div className="panel p-6 border border-white/5 bg-slate-900/10">
+          <div className="flex flex-col gap-4 border-b border-white/5 pb-4">
+            <div>
+              <h3 className="text-xl font-bold text-white">Sponsor Campaigns</h3>
+              <p className="mt-1 text-sm text-slate-400">
+                Filter and manage published homepage campaigns.
+              </p>
+            </div>
+            <div className="text-xs text-orange-300 font-semibold bg-orange-500/10 border border-orange-500/20 rounded-full px-3 py-1 w-fit">
+              {visibleManagedAds.length} ad{visibleManagedAds.length === 1 ? "" : "s"} matches
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            <input
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none text-sm"
+              placeholder="Search campaigns..."
+              value={adSearch}
+              onChange={(event) => setAdSearch(event.target.value)}
+            />
+            <select
+              className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none text-sm"
+              value={adStatusFilter}
+              onChange={(event) => setAdStatusFilter(event.target.value)}
+            >
+              <option value="all">All statuses</option>
+              {adStatuses.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none text-sm"
+              value={adDateFilter}
+              onChange={(event) => setAdDateFilter(event.target.value)}
+            />
+          </div>
+
+          <div className="mt-5 space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            {visibleManagedAds.map((ad) => (
+              <div key={ad._id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                {ad.imageUrl ? (
+                  <div className="overflow-hidden rounded-xl border border-white/5 bg-slate-950/40 p-2">
+                    <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-contain" />
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-white text-base leading-tight">{ad.title}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {adPlacements.find((placement) => placement.value === ad.placement)?.label || ad.placement}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-orange-300">{ad.status}</span>
+                  </div>
+                </div>
+                <div className="mt-3 border-t border-white/5 pt-3 grid gap-1.5 text-xs text-slate-400">
+                  <p><span className="text-slate-400 font-semibold">Advertiser:</span> {ad.advertiserName || "-"}</p>
+                  <p><span className="text-slate-400 font-semibold">Brand:</span> {ad.companyName || "-"}</p>
+                  <p><span className="text-slate-400 font-semibold">Billing:</span> Rs. {Number(ad.amount || 0).toLocaleString("en-IN")} • {ad.durationDays} days</p>
+                  <p><span className="text-slate-400 font-semibold">Priority:</span> {ad.priority}</p>
+                </div>
+                <div className="mt-4 flex gap-2 border-t border-white/5 pt-3">
+                  <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-100 transition">
+                    Edit
+                  </button>
+                  <button type="button" onClick={() => setPendingAdDelete(ad)} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500 transition">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!visibleManagedAds.length ? <p className="text-slate-500 text-xs py-4 text-center">No campaign matching the criteria.</p> : null}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderExpiryControl = () => {
+    return (
+      <div className="panel p-6 border border-orange-500/20 bg-[radial-gradient(circle_at_top,rgba(234,88,12,0.08),rgba(15,23,42,0.96)_50%)] animate-[fadeIn_0.4s_ease-out]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between border-b border-white/5 pb-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">System Parameter Control</p>
+            <h2 className="text-2xl font-bold text-white mt-1">Global ID Expiry Control</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+              Set a centralized system-wide accreditation expiration date for all reporters and chief editors. Individual user custom overrides take absolute priority over this rule.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-slate-900 border border-white/10 px-3 py-1 text-slate-500 font-medium">
+                Priority Hierarchy: User Specific Override &gt; Global Config Expiry &gt; Rolling 1-Year Expiry
+              </span>
+            </div>
+          </div>
+          <div className="w-full max-w-xs space-y-2 lg:text-right">
+            <span className="block text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Current Expiry Rule
+            </span>
+            <span className={`inline-block rounded-full px-3 py-1 text-sm font-semibold ${globalIdCardExpiry ? "bg-orange-500/15 text-orange-300 border border-orange-500/30" : "bg-slate-900 text-slate-500 border border-white/5"}`}>
+              {globalIdCardExpiry ? formatDate(globalIdCardExpiry) : "Inactive (System uses Rolling 1-Year)"}
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={saveGlobalExpiry} className="mt-6 flex flex-wrap items-end gap-4">
+          <div className="w-full sm:max-w-xs">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.24em] text-slate-400" htmlFor="global-expiry-date-picker">
+              Choose System Expiry Date
+            </label>
+            <input
+              id="global-expiry-date-picker"
+              type="date"
+              className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+              value={globalExpiryForm}
+              onChange={(event) => setGlobalExpiryForm(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="submit"
+              disabled={Boolean(busyAction)}
+              className="rounded-full bg-orange-600 hover:bg-orange-500 transition-all duration-300 px-5 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
+            >
+              Save Expiry Rule
+            </button>
+            {globalIdCardExpiry ? (
+              <button
+                type="button"
+                onClick={clearGlobalExpiry}
+                disabled={Boolean(busyAction)}
+                className="rounded-full border border-white/10 px-5 py-2.5 text-sm font-semibold text-rose-400 hover:bg-rose-500/10 transition-all duration-300 disabled:opacity-50"
+              >
+                Clear Expiry Rule
+              </button>
+            ) : null}
+          </div>
+        </form>
+      </div>
+    );
+  };
+
+  const renderContactInbox = () => {
+    return (
+      <div className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
+        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Reader Inbox</p>
+            <h2 className="text-2xl font-bold text-white mt-1">Contact Us Messages</h2>
+          </div>
+          {editingContactId ? (
+            <button type="button" onClick={resetContactAdminForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/5 transition">
+              Cancel Edit
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px]">
+          <input
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+            placeholder="Search by name, email, phone, subject, or message"
+            value={contactSearch}
+            onChange={(event) => setContactSearch(event.target.value)}
+          />
+          <select
+            className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none"
+            value={contactStatusFilter}
+            onChange={(event) => setContactStatusFilter(event.target.value)}
+          >
+            {contactStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-5 space-y-4">
+          {visibleContactMessages.map((contactMessage) => (
+            <div id={`contact-message-${contactMessage._id}`} key={contactMessage._id} className="rounded-2xl border border-white/10 p-4">
+              {editingContactId === contactMessage._id ? (
+                <div className="grid gap-4">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.fullName} readOnly />
+                    <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.email} readOnly />
+                    <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.phone || "Phone not provided"} readOnly />
+                    <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.subject} readOnly />
+                  </div>
+                  <textarea className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="5" value={contactMessage.message} readOnly />
+                  <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                    <select
+                      className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
+                      value={contactAdminForm.status}
+                      onChange={(event) => setContactAdminForm({ ...contactAdminForm, status: event.target.value })}
+                    >
+                      {contactStatusOptions.filter((option) => option.value !== "all").map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                      rows="3"
+                      placeholder="Admin note for follow-up, resolution, or internal handling"
+                      value={contactAdminForm.adminNote}
+                      onChange={(event) => setContactAdminForm({ ...contactAdminForm, adminNote: event.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => saveContactMessage(contactMessage._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 transition">Save</button>
+                    <button type="button" onClick={() => deleteContactMessage(contactMessage._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-555 transition">Delete</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <p className="text-lg font-semibold text-white">{contactMessage.subject}</p>
+                    <p className="text-sm text-slate-500">{contactMessage.fullName} • {contactMessage.email} • {contactMessage.phone || "No phone provided"}</p>
+                    <p className="text-sm text-slate-400">{contactMessage.message}</p>
+                    {contactMessage.adminNote ? <p className="text-sm text-slate-500">Admin Note: {contactMessage.adminNote}</p> : null}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                          contactMessage.status === "resolved"
+                            ? "bg-green-500/15 text-green-300"
+                            : contactMessage.status === "in_progress"
+                              ? "bg-yellow-500/15 text-yellow-300"
+                              : "bg-orange-500/15 text-orange-300"
+                        }`}
+                      >
+                        {String(contactMessage.status || "new").replaceAll("_", " ")}
+                      </span>
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">
+                        {formatDate(contactMessage.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => startEditContact(contactMessage)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition">Edit</button>
+                    <button type="button" onClick={() => deleteContactMessage(contactMessage._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">Delete</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {!visibleContactMessages.length ? <p className="text-slate-500 py-4 text-center">No contact messages match your filters.</p> : null}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSettings = () => {
+    return (
+      <div id="account-credentials-panel" className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Security & Credentials</p>
+            <h2 className="text-2xl font-bold text-white mt-1">Account Credentials</h2>
+            <p className="mt-2 text-sm text-slate-400">Update your login phone, email, display name, and password securely.</p>
+          </div>
+          <button type="button" onClick={resetCredentialForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/5 transition">
+            Reset Form
+          </button>
+        </div>
+        <form onSubmit={submitCredentials} className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div>
+            <input
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+              placeholder="Full name"
+              value={credentialForm.fullName}
+              onChange={(event) => setCredentialForm({ ...credentialForm, fullName: event.target.value })}
+            />
+            <p className="mt-2 text-xs text-slate-500">This name appears in your dashboard profile and bylines.</p>
+          </div>
+          <div>
+            <input
+              type="email"
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+              placeholder="Email address"
+              value={credentialForm.email}
+              onChange={(event) => setCredentialForm({ ...credentialForm, email: event.target.value })}
+            />
+            <p className="mt-2 text-xs text-slate-500">Use a valid email address so account recovery remains clean.</p>
+          </div>
+          <div className="lg:col-span-2">
+            <input
+              inputMode="numeric"
+              maxLength="10"
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+              placeholder="10-digit login phone number"
+              value={credentialForm.phone}
+              onChange={(event) =>
+                setCredentialForm({
+                  ...credentialForm,
+                  phone: event.target.value.replace(/\D/g, "").slice(0, 10),
+                })
+              }
+            />
+            <p className="mt-2 text-xs text-slate-500">This phone number is your login ID, so keep it unique and exactly 10 digits.</p>
+          </div>
+          <div>
+            <div className="relative">
+              <input
+                type={showCurrentPassword ? "text" : "password"}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
+                placeholder="Current password"
+                value={credentialForm.currentPassword}
+                onChange={(event) => setCredentialForm({ ...credentialForm, currentPassword: event.target.value })}
+              />
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
+                onClick={() => setShowCurrentPassword((value) => !value)}
+                aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
+              >
+                {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Enter this only when you want to set a new password.</p>
+          </div>
+          <div>
+            <div className="relative">
+              <input
+                type={showNewPassword ? "text" : "password"}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
+                placeholder="New password"
+                value={credentialForm.newPassword}
+                onChange={(event) => setCredentialForm({ ...credentialForm, newPassword: event.target.value })}
+              />
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
+                onClick={() => setShowNewPassword((value) => !value)}
+                aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Leave the password fields empty if you only want to update name, phone, or email.</p>
+          </div>
+          <div className="lg:col-span-2">
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
+                placeholder="Confirm new password"
+                value={credentialForm.confirmNewPassword}
+                onChange={(event) => setCredentialForm({ ...credentialForm, confirmNewPassword: event.target.value })}
+              />
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
+                onClick={() => setShowConfirmPassword((value) => !value)}
+                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Your new password must be at least 6 characters long.</p>
+          </div>
+          <button className="rounded-2xl bg-orange-500 hover:bg-orange-400 transition px-4 py-3 font-semibold text-white lg:col-span-2 shadow-lg">
+            {credentialBusy ? "Saving..." : "Update Credentials"}
+          </button>
+        </form>
+      </div>
+    );
+  };
+
+  const renderSkeleton = () => {
+    return (
+      <div className="space-y-8 animate-pulse">
+        {/* Header briefing skeleton */}
+        <div className="space-y-3">
+          <div className="h-3.5 w-32 bg-slate-800 rounded" />
+          <div className="h-8 w-64 bg-slate-800 rounded" />
+          <div className="h-3 w-96 bg-slate-800 rounded" />
+        </div>
+
+        {/* Metrics cards grid skeleton */}
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={`sk-card-${index}`} className="panel p-6 space-y-3 bg-slate-900/10 border-white/5">
+              <div className="h-3 w-16 bg-slate-800 rounded" />
+              <div className="h-8 w-12 bg-slate-800 rounded" />
+              <div className="h-2.5 w-24 bg-slate-800 rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Main panels skeleton */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="panel p-6 space-y-4 bg-slate-900/10 border-white/5 lg:col-span-1">
+            <div className="h-4 w-32 bg-slate-800 rounded" />
+            <div className="space-y-2.5 pt-2">
+              <div className="h-3 w-full bg-slate-800 rounded" />
+              <div className="h-3 w-5/6 bg-slate-800 rounded" />
+              <div className="h-3 w-4/5 bg-slate-800 rounded" />
+              <div className="h-3 w-full bg-slate-800 rounded" />
+            </div>
+          </div>
+          <div className="panel p-6 space-y-4 bg-slate-900/10 border-white/5 md:col-span-1 lg:col-span-2">
+            <div className="h-4 w-32 bg-slate-800 rounded" />
+            <div className="space-y-2.5 pt-2">
+              <div className="h-3 w-full bg-slate-800 rounded" />
+              <div className="h-3 w-11/12 bg-slate-800 rounded" />
+              <div className="h-3 w-5/6 bg-slate-800 rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
+    <div className="min-h-screen bg-[#05070c] text-slate-100 flex flex-col lg:flex-row">
+      {/* GLOBAL MODALS, TOASTS & COMPOSERS */}
       <ActionPopup
         open={Boolean(actionPopup)}
         type={actionPopup?.type}
@@ -1247,6 +2477,7 @@ export const DashboardPage = () => {
         persistent={actionPopup?.persistent}
         onClose={actionPopup?.persistent ? undefined : () => setActionPopup(null)}
       />
+      
       <ConfirmActionModal
         open={showArchiveDeleteModal}
         title="Delete published news for the selected date"
@@ -1261,6 +2492,7 @@ export const DashboardPage = () => {
         }}
         onConfirm={confirmPublishedArchiveDelete}
       />
+      
       <ConfirmActionModal
         open={Boolean(pendingAdDelete)}
         title="Delete advertisement"
@@ -1281,6 +2513,7 @@ export const DashboardPage = () => {
           await deleteAd(targetId);
         }}
       />
+      
       <ConfirmActionModal
         open={Boolean(pendingArchiveArticleDelete)}
         title="Delete published article"
@@ -1301,6 +2534,7 @@ export const DashboardPage = () => {
           await deleteArchiveArticle(targetId);
         }}
       />
+      
       <ConfirmActionModal
         open={Boolean(pendingManagedUserDelete)}
         title="Delete newsroom user"
@@ -1321,6 +2555,7 @@ export const DashboardPage = () => {
           await deleteManagedUser(targetId);
         }}
       />
+      
       <VoiceNewsComposer
         open={showVoiceDesk}
         onClose={closeVoiceDesk}
@@ -1330,1120 +2565,209 @@ export const DashboardPage = () => {
         defaultArea={profile?.area || ""}
         onSubmitted={handleVoiceNewsSubmitted}
       />
-      {showDisabledDashboardState ? (
-        <div className="flex min-h-[70vh] items-center justify-center">
-          <div className="w-full max-w-4xl overflow-hidden rounded-[36px] border border-rose-400/20 bg-[radial-gradient(circle_at_top,rgba(251,113,133,0.2),rgba(15,23,42,0.96)_45%,rgba(2,6,23,0.98))] p-8 text-center shadow-[0_32px_80px_rgba(15,23,42,0.48)] md:p-12">
-            <p className="text-sm font-semibold uppercase tracking-[0.34em] text-rose-300">Access Restricted</p>
-            <h1 className="mt-6 font-display text-5xl font-semibold text-rose-100 md:text-7xl">Account Disabled</h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
-              Your newsroom actions have been disabled by the super admin. Publishing, review, archive, and voice-news tools are temporarily unavailable for this account.
-            </p>
-            <div className="mx-auto mt-8 max-w-2xl rounded-[28px] border border-white/10 bg-white/5 p-6 text-left">
-              <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
-                <p><span className="font-semibold text-white">Role:</span> {String(profile?.role || user?.role || "-").replaceAll("_", " ")}</p>
-                <p><span className="font-semibold text-white">Approval:</span> {profile?.approvalStatus || "-"}</p>
-                <p><span className="font-semibold text-white">Phone Verified:</span> {profile?.isPhoneVerified ? "Yes" : "No"}</p>
-                <p><span className="font-semibold text-white">Email:</span> {profile?.email || "-"}</p>
-              </div>
-            </div>
-            <p className="mt-8 text-sm leading-7 text-slate-400">
-              Please contact the super admin if you need your newsroom access restored.
-            </p>
-          </div>
+
+      {/* Floating Action Buttons for quick news desk action */}
+      {showDashboardActions && !showDisabledDashboardState && (
+        <div className="fixed bottom-6 right-6 z-[70] flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("write_news")}
+            className={`flex h-14 w-14 items-center justify-center rounded-full bg-orange-600 text-white shadow-2xl transition hover:bg-orange-500 hover:scale-105 active:scale-95 shadow-orange-950/40 ${
+              activeTab === "write_news" ? "ring-4 ring-orange-500/30 scale-105" : ""
+            }`}
+            aria-label="Write news article"
+            title="Write News Story"
+          >
+            <FilePlus2 className="h-6 w-6 text-white" />
+          </button>
+
+          <button
+            type="button"
+            onClick={openVoiceDesk}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-2xl transition hover:bg-emerald-500 hover:scale-105 active:scale-95 shadow-emerald-950/40"
+            aria-label="Open voice recorder"
+            title="Record Voice News"
+          >
+            <Mic className="h-6 w-6 text-white" />
+          </button>
         </div>
-      ) : (
-        <>
-      {showDashboardActions ? (
-        <>
-          <div className="fixed bottom-4 left-4 z-[70] flex flex-col gap-3 sm:bottom-6 sm:left-6">
-            <button
-              type="button"
-              onClick={openCredentialForm}
-              className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full bg-orange-500 px-4 py-3 text-[13px] font-semibold text-white shadow-2xl shadow-orange-900/30 transition hover:bg-orange-400 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
-            >
-              <KeyRound size={18} />
-              Update Credentials
-            </button>
-            {showReporterCardAction ? (
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    const parts = reporterCardUrl.split(",");
-                    const base64Data = parts[1] || parts[0];
-                    const byteCharacters = atob(base64Data);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                      byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: "application/pdf" });
-                    const blobUrl = URL.createObjectURL(blob);
-                    window.open(blobUrl, "_blank");
-                  } catch (err) {
-                    console.error("Failed to view ID card PDF", err);
-                  }
-                }}
-                className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full bg-white px-4 py-3 text-[13px] font-semibold text-slate-900 shadow-2xl shadow-slate-950/20 transition hover:bg-slate-100 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
-              >
-                <IdCard size={18} />
-                {user?.role === "chief_editor" ? "Chief Editor ID Card" : "Reporter ID Card"}
-              </button>
-            ) : null}
-          </div>
-          <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-3 sm:bottom-6 sm:right-6">
-            <button
-              type="button"
-              onClick={openReporterDesk}
-              className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full bg-emerald-600 px-4 py-3 text-[13px] font-semibold text-white shadow-2xl shadow-emerald-950/30 transition hover:bg-emerald-500 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
-            >
-              <FilePlus2 size={18} />
-              {user?.role === "super_admin" ? "Publish News" : "Add News"}
-            </button>
-            <button
-              type="button"
-              onClick={openVoiceDesk}
-              className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full border border-emerald-300/30 bg-slate-950/95 px-4 py-3 text-[13px] font-semibold text-white shadow-[0_20px_55px_rgba(5,150,105,0.34)] backdrop-blur transition hover:border-emerald-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
-              aria-label="Open voice news recorder"
-            >
-              <Mic className="h-5 w-5 text-emerald-300" />
-              <span>Record News</span>
-            </button>
-            {user?.role === "super_admin" ? (
-              <button
-                type="button"
-                onClick={() => setShowAdRequestsPanel(true)}
-                className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full border border-orange-300/35 bg-slate-950/95 px-4 py-3 text-[13px] font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-orange-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
-              >
-                <Megaphone className="h-5 w-5 text-orange-300" />
-                <span>Ad Requests</span>
-                {pendingAdRequestsCount ? (
-                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-bold text-white">{pendingAdRequestsCount}</span>
-                ) : null}
-              </button>
-            ) : null}
-            {user?.role === "super_admin" ? (
-              <button
-                type="button"
-                onClick={focusManageAdsSection}
-                className="inline-flex w-[min(44vw,14rem)] items-center justify-center gap-3 rounded-full border border-emerald-300/35 bg-slate-950/95 px-4 py-3 text-[13px] font-semibold text-white shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur transition hover:border-emerald-300/60 hover:bg-slate-900 sm:w-auto sm:justify-start sm:px-5 sm:text-sm"
-              >
-                <FolderKanban className="h-5 w-5 text-emerald-300" />
-                <span>Manage Ads</span>
-              </button>
-            ) : null}
-          </div>
-        </>
-      ) : null}
-      <div>
-        <p className="text-sm uppercase tracking-[0.3em] text-orange-300">Dashboard</p>
-        <h1 className="mt-3 font-display text-4xl text-white">{user ? `${user.fullName} workspace` : "Role-based operations"}</h1>
-      </div>
+      )}
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => (
-          <MetricCard key={card.label} {...card} />
-        ))}
-      </div>
+      {/* LEFT COLUMN: SIDEBAR */}
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/5 bg-[#05070c]/95 backdrop-blur-md transition-all duration-300 lg:sticky lg:top-[68px] lg:h-[calc(100vh-68px)] lg:translate-x-0 ${sidebarOpen ? "translate-x-0 !z-50" : "-translate-x-full"}`}>
+        <div className="flex h-16 items-center justify-between border-b border-white/5 px-6">
+          <div className="flex flex-col">
+            <span className="text-white font-extrabold text-sm tracking-widest uppercase">PALAMU EXPRESS</span>
+            <span className="text-orange-500 font-bold text-[9px] tracking-widest mt-0.5">NEWSROOM CMS</span>
+          </div>
+          <button type="button" onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+        
+        {/* Nav list */}
+        <nav className="flex-1 space-y-1.5 px-4 py-6 overflow-y-auto">
+          {user?.role === "super_admin" && (
+            <>
+              <button onClick={() => { setActiveTab("overview"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "overview" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <LayoutDashboard size={18} />
+                Overview
+              </button>
+              <button onClick={() => { setActiveTab("my_stories"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "my_stories" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <FileText size={18} />
+                My Articles
+              </button>
+              <button onClick={() => { setActiveTab("approvals"); setSidebarOpen(false); }} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "approvals" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <div className="flex items-center gap-3">
+                  <UserCheck size={18} />
+                  Approvals
+                </div>
+                {pendingUsers.length > 0 && (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">{pendingUsers.length}</span>
+                )}
+              </button>
+              <button onClick={() => { setActiveTab("directory"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "directory" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <Users size={18} />
+                Journalist Directory
+              </button>
+              <button onClick={() => { setActiveTab("ad_desk"); setSidebarOpen(false); }} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "ad_desk" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <div className="flex items-center gap-3">
+                  <Megaphone size={18} />
+                  Ad Desk
+                </div>
+                {pendingAdRequestsCount > 0 && (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">{pendingAdRequestsCount}</span>
+                )}
+              </button>
+              <button onClick={() => { setActiveTab("expiry_control"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "expiry_control" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <Calendar size={18} />
+                Global Expiry
+              </button>
+              <button onClick={() => { setActiveTab("contact_inbox"); setSidebarOpen(false); }} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "contact_inbox" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <div className="flex items-center gap-3">
+                  <Inbox size={18} />
+                  Contact Inbox
+                </div>
+                {contactMessages.filter(m => m.status === "new").length > 0 && (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">{contactMessages.filter(m => m.status === "new").length}</span>
+                )}
+              </button>
+              <button onClick={() => { setActiveTab("credentials"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "credentials" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <Settings size={18} />
+                Account Settings
+              </button>
+            </>
+          )}
 
-      <div className={`grid gap-6 lg:grid-cols-2 ${showReporterCardAction ? "xl:grid-cols-3" : ""}`}>
-        <div className="panel p-6">
-          <h2 className="text-xl font-semibold text-white">{onboardingTitle}</h2>
-          {profile ? (
-            <div className="mt-5">
-              <DetailRow label="Role" value={String(profile.role || "-").replaceAll("_", " ")} />
-              <DetailRow label="Approval Status" value={profile.approvalStatus || "-"} />
-              <DetailRow label="Phone Verified" value={profile.isPhoneVerified ? "Yes" : "No"} />
-              <DetailRow label="Phone" value={profile.phone || "-"} />
-              <DetailRow label="Email" value={profile.email || "-"} />
-              <DetailRow label="Joined On" value={formatDate(profile.createdAt)} />
-              {(user?.role === "reporter" || user?.role === "chief_editor") ? <DetailRow label="District" value={profile.district || "-"} /> : null}
-              {(user?.role === "reporter" || user?.role === "chief_editor") ? <DetailRow label="Area / Block" value={profile.area || "-"} /> : null}
-              {user?.role === "reporter" ? <DetailRow label="Reporter Code" value={profile.reporterCode || "Not generated yet"} /> : null}
-              {user?.role === "chief_editor" ? <DetailRow label="Chief Editor Code" value={profile.chiefEditorCode || "Not generated yet"} /> : null}
-              {profile.rejectionFeedback ? <DetailRow label="Admin Feedback" value={profile.rejectionFeedback} valueClassName="text-right text-rose-300" /> : null}
+          {user?.role === "chief_editor" && (
+            <>
+              <button onClick={() => { setActiveTab("overview"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "overview" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <LayoutDashboard size={18} />
+                Overview
+              </button>
+              <button onClick={() => { setActiveTab("my_stories"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "my_stories" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <FileText size={18} />
+                My Articles
+              </button>
+              <button onClick={() => { setActiveTab("queue"); setSidebarOpen(false); }} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "queue" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <div className="flex items-center gap-3">
+                  <Layers size={18} />
+                  Publishing Queue
+                </div>
+                {pendingArticles.length > 0 && (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">{pendingArticles.length}</span>
+                )}
+              </button>
+              <button onClick={() => { setActiveTab("credentials"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "credentials" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <Settings size={18} />
+                Account Settings
+              </button>
+            </>
+          )}
+
+          {user?.role === "reporter" && (
+            <>
+              <button onClick={() => { setActiveTab("overview"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "overview" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <LayoutDashboard size={18} />
+                Overview
+              </button>
+              <button onClick={() => { setActiveTab("my_stories"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "my_stories" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <FileText size={18} />
+                My Articles
+              </button>
+              <button onClick={() => { setActiveTab("credentials"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "credentials" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <Settings size={18} />
+                Account Settings
+              </button>
+            </>
+          )}
+        </nav>
+      </aside>
+
+      {/* RIGHT COLUMN: WORKSPACE CONTAINER */}
+      <main className="flex-grow flex-1 flex flex-col overflow-hidden min-h-screen">
+        {/* Workspace Top-Bar Header */}
+        <header className="flex h-16 items-center justify-between border-b border-white/5 bg-[#05070c]/50 px-6 backdrop-blur">
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-400 hover:text-white">
+              <Menu size={22} />
+            </button>
+            <div className="hidden sm:flex flex-col">
+              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Newsroom CMS Workspace</span>
+              <span className="text-white text-[10px] font-bold mt-0.5 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
+                Active Database Node Connected
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <span className="rounded-full bg-orange-500/15 border border-orange-500/30 px-3 py-1 text-xs font-bold text-orange-300 uppercase tracking-widest">
+              {String(profile?.role || user?.role || "staff").replaceAll("_", " ")}
+            </span>
+          </div>
+        </header>
+
+        {/* Content Container */}
+        <div className="flex-grow p-6 overflow-y-auto">
+          {showDisabledDashboardState ? (
+            <div className="flex min-h-[70vh] items-center justify-center">
+              <div className="w-full max-w-4xl overflow-hidden rounded-[36px] border border-rose-400/20 bg-[radial-gradient(circle_at_top,rgba(251,113,133,0.2),rgba(15,23,42,0.96)_45%,rgba(2,6,23,0.98))] p-8 text-center shadow-[0_32px_80px_rgba(15,23,42,0.48)] md:p-12">
+                <p className="text-sm font-semibold uppercase tracking-[0.34em] text-rose-300">Access Restricted</p>
+                <h1 className="mt-6 font-display text-5xl font-semibold text-rose-100 md:text-7xl">Account Disabled</h1>
+                <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
+                  Your newsroom actions have been disabled by the super admin. Publishing, review, archive, and voice-news tools are temporarily unavailable for this account.
+                </p>
+                <div className="mx-auto mt-8 max-w-2xl rounded-[28px] border border-white/10 bg-white/5 p-6 text-left">
+                  <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+                    <p><span className="font-semibold text-white">Role:</span> {String(profile?.role || user?.role || "-").replaceAll("_", " ")}</p>
+                    <p><span className="font-semibold text-white">Approval:</span> {profile?.approvalStatus || "-"}</p>
+                    <p><span className="font-semibold text-white">Phone Verified:</span> {profile?.isPhoneVerified ? "Yes" : "No"}</p>
+                    <p><span className="font-semibold text-white">Email:</span> {profile?.email || "-"}</p>
+                  </div>
+                </div>
+                <p className="mt-8 text-sm leading-7 text-slate-400">
+                  Please contact the super admin if you need your newsroom access restored.
+                </p>
+              </div>
             </div>
           ) : (
-            <p className="mt-4 text-slate-500">Loading profile...</p>
+            <>
+              {dashboardLoading && renderSkeleton()}
+              {!dashboardLoading && activeTab === "overview" && renderOverview()}
+              {!dashboardLoading && activeTab === "write_news" && renderWriteNews()}
+              {!dashboardLoading && activeTab === "my_stories" && renderMyStories()}
+              {!dashboardLoading && activeTab === "approvals" && user?.role === "super_admin" && renderApprovals()}
+              {!dashboardLoading && activeTab === "directory" && user?.role === "super_admin" && renderDirectory()}
+              {!dashboardLoading && activeTab === "queue" && user?.role === "chief_editor" && renderQueue()}
+              {!dashboardLoading && activeTab === "ad_desk" && user?.role === "super_admin" && renderAdDesk()}
+              {!dashboardLoading && activeTab === "expiry_control" && user?.role === "super_admin" && renderExpiryControl()}
+              {!dashboardLoading && activeTab === "contact_inbox" && user?.role === "super_admin" && renderContactInbox()}
+              {!dashboardLoading && activeTab === "credentials" && renderSettings()}
+            </>
           )}
         </div>
-
-        <div className="panel p-6">
-          <h2 className="text-xl font-semibold text-white">{user?.role === "super_admin" ? "Admin Access Notes" : "Desk Access Notes"}</h2>
-          <div className="mt-5 space-y-4 text-sm leading-6 text-slate-500">
-            {user?.role === "super_admin" ? (
-              <>
-                <p>Your dashboard controls reporter approvals, story publishing, advertisement priority, and overall homepage sponsor visibility.</p>
-                <p>Higher priority ads appear earlier in each homepage placement. Use small numbers like 1, 2, and 3 for your most important campaigns.</p>
-                <p>When an ad is marked active, it becomes eligible for homepage display until its duration window ends.</p>
-              </>
-            ) : user?.role === "chief_editor" ? (
-              <>
-                <p>Your chief editor desk opens after approval, phone verification, and active newsroom access. Super admin can temporarily disable these actions when needed.</p>
-                <p>Use the editorial queue to publish strong reports quickly or send revision feedback back to the reporter desk.</p>
-                <p>Your dashboard also shows live newsroom metrics so you can monitor pending and published coverage.</p>
-              </>
-            ) : (
-              <>
-                <p>Your reporter desk opens after approval, phone verification, and active newsroom access. Super admin can temporarily disable these actions when needed.</p>
-                <p>Use the excerpt field for a concise summary and the full content field for the complete report copy.</p>
-                <p>Approved reporters also receive a generated reporter ID card link directly inside this dashboard.</p>
-              </>
-            )}
-          </div>
-        </div>
-
-        {showReporterCardAction ? (
-          <IDCardPreview profile={profile} cardUrl={reporterCardUrl} />
-        ) : null}
-      </div>
-
-      {showCredentialForm ? (
-        <div id="account-credentials-panel" className="panel p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Account Credentials</h2>
-              <p className="mt-2 text-sm text-slate-500">Update your login phone, email, display name, and password from one place.</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={resetCredentialForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
-                Reset
-              </button>
-              <button type="button" onClick={closeCredentialForm} className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white">
-                <X size={16} />
-                Close
-              </button>
-            </div>
-          </div>
-          <form onSubmit={submitCredentials} className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div>
-              <input
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-                placeholder="Full name"
-                value={credentialForm.fullName}
-                onChange={(event) => setCredentialForm({ ...credentialForm, fullName: event.target.value })}
-              />
-              <p className="mt-2 text-xs text-slate-500">This name appears in your dashboard profile and bylines where applicable.</p>
-            </div>
-            <div>
-              <input
-                type="email"
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-                placeholder="Email address"
-                value={credentialForm.email}
-                onChange={(event) => setCredentialForm({ ...credentialForm, email: event.target.value })}
-              />
-              <p className="mt-2 text-xs text-slate-500">Use a valid email address so account recovery and contact details stay correct.</p>
-            </div>
-            <div className="lg:col-span-2">
-              <input
-                inputMode="numeric"
-                maxLength="10"
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-                placeholder="10-digit login phone number"
-                value={credentialForm.phone}
-                onChange={(event) =>
-                  setCredentialForm({
-                    ...credentialForm,
-                    phone: event.target.value.replace(/\D/g, "").slice(0, 10),
-                  })
-                }
-              />
-              <p className="mt-2 text-xs text-slate-500">This phone number is your login ID, so keep it unique and exactly 10 digits.</p>
-            </div>
-            <div>
-              <div className="relative">
-                <input
-                  type={showCurrentPassword ? "text" : "password"}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white"
-                  placeholder="Current password"
-                  value={credentialForm.currentPassword}
-                  onChange={(event) => setCredentialForm({ ...credentialForm, currentPassword: event.target.value })}
-                />
-                <button
-                  type="button"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-                  onClick={() => setShowCurrentPassword((value) => !value)}
-                  aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
-                >
-                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">Enter this only when you want to set a new password.</p>
-            </div>
-            <div>
-              <div className="relative">
-                <input
-                  type={showNewPassword ? "text" : "password"}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white"
-                  placeholder="New password"
-                  value={credentialForm.newPassword}
-                  onChange={(event) => setCredentialForm({ ...credentialForm, newPassword: event.target.value })}
-                />
-                <button
-                  type="button"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-                  onClick={() => setShowNewPassword((value) => !value)}
-                  aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-                >
-                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">Leave the password fields empty if you only want to update name, phone, or email.</p>
-            </div>
-            <div className="lg:col-span-2">
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white"
-                  placeholder="Confirm new password"
-                  value={credentialForm.confirmNewPassword}
-                  onChange={(event) => setCredentialForm({ ...credentialForm, confirmNewPassword: event.target.value })}
-                />
-                <button
-                  type="button"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-                  onClick={() => setShowConfirmPassword((value) => !value)}
-                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">Your new password must be at least 6 characters long.</p>
-            </div>
-            <button className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white lg:col-span-2">
-              {credentialBusy ? "Saving..." : "Update Credentials"}
-            </button>
-          </form>
-        </div>
-      ) : null}
-
-      {(user?.role === "reporter" || user?.role === "chief_editor" || user?.role === "super_admin") ? (
-        <div className="space-y-6">
-          {showReporterDesk ? (
-            <div id="reporter-desk-panel" className="panel p-6">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-2xl font-semibold text-white">
-                  {user?.role === "super_admin" ? "Super Admin News Desk" : user?.role === "chief_editor" ? "Chief Editor Desk" : "Reporter Desk"}
-                </h2>
-                <div className="flex flex-wrap gap-3">
-                  {editingArticleId ? (
-                    <button type="button" onClick={resetArticleForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
-                      Cancel Edit
-                    </button>
-                  ) : null}
-                  <button type="button" onClick={closeReporterDesk} className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white">
-                    <X size={16} />
-                    Close
-                  </button>
-                </div>
-              </div>
-
-              {!canAccessNewsDesk ? (
-                <p className="mt-4 text-slate-500">
-                  {isFunctionalityDisabled
-                    ? "Your newsroom actions are currently disabled by the super admin. Article publishing and review tools are temporarily unavailable."
-                    : "Your news desk unlocks after super admin approval and phone verification."}
-                </p>
-              ) : (
-                <form onSubmit={submitArticle} className="mt-5 grid gap-4 md:grid-cols-2">
-                  <input id="article-headline-input" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white md:col-span-2" placeholder="Headline" value={articleForm.title} onChange={(event) => setArticleForm({ ...articleForm, title: event.target.value })} />
-                  <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={articleForm.district} onChange={(event) => setArticleForm({ ...articleForm, district: event.target.value, area: "" })}>
-                    <option value="">Select district</option>
-                    {jharkhandDistricts.map((district) => (
-                      <option key={district} value={district}>{district}</option>
-                    ))}
-                  </select>
-                  <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={articleForm.area} onChange={(event) => setArticleForm({ ...articleForm, area: event.target.value })}>
-                    <option value="">Select block</option>
-                    {articleBlocks.map((block) => (
-                      <option key={block} value={block}>{block}</option>
-                    ))}
-                  </select>
-                  <textarea className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white md:col-span-2" rows="3" placeholder="Short excerpt" value={articleForm.excerpt} onChange={(event) => setArticleForm({ ...articleForm, excerpt: event.target.value })} />
-                  <textarea className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white md:col-span-2" rows="8" placeholder="Full article content" value={articleForm.content} onChange={(event) => setArticleForm({ ...articleForm, content: event.target.value })} />
-                  <div className="md:col-span-2">
-                    <ImagePicker
-                      label="Article Cover Image"
-                      helpText="Upload a strong visual to make the story look professional on cards and article pages."
-                      value={articleForm.coverImageUrl}
-                      onChange={(value) => setArticleForm({ ...articleForm, coverImageUrl: value })}
-                    />
-                  </div>
-                  <label className="flex items-center gap-3 text-sm text-slate-500 md:col-span-2">
-                    <input type="checkbox" checked={articleForm.breaking} onChange={(event) => setArticleForm({ ...articleForm, breaking: event.target.checked })} />
-                    Mark as breaking news
-                  </label>
-                  <button className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white md:col-span-2">
-                    {busyAction ? "Saving..." : editingArticleId ? "Update Article" : user?.role === "super_admin" ? "Publish News" : "Submit News"}
-                  </button>
-                </form>
-              )}
-            </div>
-          ) : null}
-
-          <div className="panel p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <h2 className="text-2xl font-semibold text-white">My Articles</h2>
-              <select
-                className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
-                value={articleStatusFilter}
-                onChange={(event) => {
-                  setArticleStatusFilter(event.target.value);
-                  setArticlePage(1);
-                }}
-              >
-                <option value="all">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="rejected">Rejected</option>
-                <option value="published">Published</option>
-              </select>
-            </div>
-            <div className="mt-5 space-y-4">
-              {pagedArticles.map((article) => (
-                <div
-                  key={article._id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openArticleFromDashboard(article)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openArticleFromDashboard(article);
-                    }
-                  }}
-                  className="cursor-pointer rounded-2xl border border-white/10 p-4 transition hover:border-white/20 hover:bg-white/[0.03]"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-lg font-semibold text-white">{article.title}</p>
-                      <p className="text-sm text-slate-500">By {getArticleAuthorName(article)}</p>
-                      <p className="text-sm text-slate-500">Published: {getArticlePublishedLabel(article)}</p>
-                      <p className="text-sm text-slate-500">Views: {getArticleViews(article)}</p>
-                      <p className="text-sm text-slate-500">{joinMetaParts(article.district, article.area, article.status)}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {article.audioUrl ? (
-                        <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
-                      ) : null}
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
-                    </div>
-                  </div>
-                  {article.editorFeedback ? <p className="mt-3 text-sm text-rose-300">Feedback: {article.editorFeedback}</p> : null}
-                  {article.coverImageUrl ? (
-                    <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
-                      <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" />
-                    </div>
-                  ) : null}
-                  {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button type="button" onClick={(event) => {
-                      event.stopPropagation();
-                      copyArticleLink(article);
-                    }} className="dashboard-copy-button rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white">
-                      Copy Link
-                    </button>
-                  </div>
-                  {article.status !== "published" ? (
-                    <div className="mt-4 flex gap-3">
-                      {!article.audioUrl ? (
-                        <button type="button" onClick={(event) => {
-                          event.stopPropagation();
-                          startEditArticle(article);
-                        }} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
-                          Edit
-                        </button>
-                      ) : null}
-                      <button type="button" onClick={(event) => {
-                        event.stopPropagation();
-                        deleteArticle(article._id);
-                      }} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
-                        Delete
-                      </button>
-                    </div>
-                  ) : null}
-                  {article.audioUrl && article.status !== "published" ? (
-                    <p className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Voice submissions can be re-recorded from the floating voice desk before resubmitting.
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-            {filteredArticles.length > 4 ? (
-              <div className="mt-5 flex items-center justify-between">
-                <button type="button" disabled={articlePage === 1} onClick={() => setArticlePage((value) => Math.max(1, value - 1))} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white disabled:opacity-40">
-                  Previous
-                </button>
-                <span className="text-sm text-slate-500">Page {articlePage} of {totalArticlePages}</span>
-                <button type="button" disabled={articlePage === totalArticlePages} onClick={() => setArticlePage((value) => Math.min(totalArticlePages, value + 1))} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white disabled:opacity-40">
-                  Next
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          {user?.role === "chief_editor" ? (
-            <>
-              <PublishedArchiveSection
-                selectedDate={publishedArchiveDate}
-                onDateChange={setPublishedArchiveDate}
-                articles={publishedArchiveArticles}
-                onRefresh={() => refreshPublishedArchive()}
-                onDelete={requestPublishedArchiveDelete}
-                busy={archiveBusy}
-                onEditArticle={startEditArticle}
-                onDeleteArticle={(article) => setPendingArchiveArticleDelete(article)}
-                onCopyLink={copyArticleLink}
-                onOpenArticle={openArticleFromDashboard}
-              />
-
-            <div className="panel p-6">
-              <h2 className="text-2xl font-semibold text-white">News Publishing Queue</h2>
-              <input className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Search pending stories" value={pendingArticleSearch} onChange={(event) => setPendingArticleSearch(event.target.value)} />
-              <div className="mt-5 space-y-4">
-                {visiblePendingArticles.map((article) => (
-                  <div key={article._id} className="rounded-2xl border border-white/10 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <p className="text-lg font-semibold text-white">{article.title}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {article.audioUrl ? (
-                          <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
-                        ) : null}
-                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
-                      </div>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500">By {joinMetaParts(article.author?.fullName, article.district, article.area)}</p>
-                    <p className="mt-3 text-sm text-slate-400">{article.excerpt}</p>
-                    {article.coverImageUrl ? (
-                      <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
-                        <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" />
-                      </div>
-                    ) : null}
-                    {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
-                    <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="2" placeholder="Editorial feedback for rejection" value={feedbacks[`article-${article._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`article-${article._id}`]: event.target.value })} />
-                    <div className="mt-4 flex gap-3">
-                      <button type="button" onClick={() => approveArticle(article._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Publish</button>
-                      <button type="button" onClick={() => rejectArticle(article._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Reject</button>
-                    </div>
-                  </div>
-                ))}
-                {!visiblePendingArticles.length ? <p className="text-slate-500">No pending stories match your search.</p> : null}
-              </div>
-            </div>
-            </>
-          ) : null}
-        </div>
-      ) : null}
-
-      {user?.role === "super_admin" ? (
-        <div className="space-y-6">
-          <PublishedArchiveSection
-            selectedDate={publishedArchiveDate}
-            onDateChange={setPublishedArchiveDate}
-            articles={publishedArchiveArticles}
-            onRefresh={() => refreshPublishedArchive()}
-            onDelete={requestPublishedArchiveDelete}
-            busy={archiveBusy}
-            onEditArticle={startEditArticle}
-            onDeleteArticle={(article) => setPendingArchiveArticleDelete(article)}
-            onCopyLink={copyArticleLink}
-            onOpenArticle={openArticleFromDashboard}
-          />
-
-          <div className="panel p-6">
-            <h2 className="text-2xl font-semibold text-white">Reporter Approvals</h2>
-            <input className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Search pending reporters" value={pendingUserSearch} onChange={(event) => setPendingUserSearch(event.target.value)} />
-            <div className="mt-5 space-y-4">
-              {visiblePendingUsers.map((pendingUser) => (
-                <div key={pendingUser._id} className="rounded-2xl border border-white/10 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <p className="text-lg font-semibold text-white">{pendingUser.fullName}</p>
-                      <p className="text-sm text-slate-500">{joinMetaParts(pendingUser.phone, pendingUser.district, pendingUser.area)}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => approveUser(pendingUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Approve</button>
-                      <button type="button" onClick={() => rejectUser(pendingUser._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Reject</button>
-                    </div>
-                  </div>
-                  <input className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Optional rejection feedback" value={feedbacks[`user-${pendingUser._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`user-${pendingUser._id}`]: event.target.value })} />
-                </div>
-              ))}
-              {!visiblePendingUsers.length ? <p className="text-slate-500">No reporter approvals match your search.</p> : null}
-            </div>
-          </div>
-
-          <div className="panel p-6">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-2xl font-semibold text-white">Manage Reporters And Chief Editors</h2>
-              {editingManagedUserId ? (
-                <button type="button" onClick={resetManagedUserForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
-                  Cancel Edit
-                </button>
-              ) : null}
-            </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px]">
-              <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Search all registered reporters and chief editors" value={managedUserSearch} onChange={(event) => setManagedUserSearch(event.target.value)} />
-              <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={managedUserStatusFilter} onChange={(event) => setManagedUserStatusFilter(event.target.value)}>
-                <option value="all">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-            <div className="mt-5 space-y-4">
-              {visibleManagedUsers.map((managedUser) => (
-                <div id={`managed-user-${managedUser._id}`} key={managedUser._id} className="rounded-2xl border border-white/10 p-4">
-                  {editingManagedUserId === managedUser._id ? (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {managedUserForm.role === "reporter" ? (
-                        <>
-                          <div className="md:col-span-1">
-                            <ManagedImagePreview
-                              title="Profile Photo"
-                              src={managedUserForm.profilePhotoUrl}
-                              alt={managedUserForm.fullName || "Profile preview"}
-                            />
-                          </div>
-                          <div className="md:col-span-1">
-                            <ManagedImagePreview
-                              title="Aadhaar Photo"
-                              src={managedUserForm.aadhaarImageUrl}
-                              alt={managedUserForm.fullName || "Aadhaar preview"}
-                            />
-                          </div>
-                        </>
-                      ) : null}
-                      {managedUserForm.role === "chief_editor" ? (
-                        <div className="md:col-span-2">
-                          <ManagedImagePreview
-                            title="Live Photo"
-                            src={managedUserForm.livePhotoUrl}
-                            alt={managedUserForm.fullName || "Live photo preview"}
-                          />
-                        </div>
-                      ) : null}
-                      {managedUserForm.role === "reporter" ? (
-                        <>
-                          <div className="md:col-span-2">
-                            <ImagePicker
-                              label="Reupload Profile Photo"
-                              helpText="Replace the current reporter profile image if the existing file needs correction."
-                              value={managedUserForm.profilePhotoUrl}
-                              onChange={(value) => setManagedUserForm({ ...managedUserForm, profilePhotoUrl: value })}
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <ImagePicker
-                              label="Reupload Aadhaar Photo"
-                              helpText="Replace the Aadhaar image for KYC correction or better clarity."
-                              value={managedUserForm.aadhaarImageUrl}
-                              onChange={(value) => setManagedUserForm({ ...managedUserForm, aadhaarImageUrl: value })}
-                            />
-                          </div>
-                        </>
-                      ) : null}
-                      {managedUserForm.role === "chief_editor" ? (
-                        <div className="md:col-span-2">
-                          <WebcamCapture
-                            value={managedUserForm.livePhotoUrl}
-                            onCapture={(value) => setManagedUserForm({ ...managedUserForm, livePhotoUrl: value })}
-                          />
-                        </div>
-                      ) : null}
-                      <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={managedUserForm.fullName} onChange={(event) => setManagedUserForm({ ...managedUserForm, fullName: event.target.value })} placeholder="Full name" />
-                      <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={managedUserForm.email} onChange={(event) => setManagedUserForm({ ...managedUserForm, email: event.target.value })} placeholder="Email" />
-                      <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={managedUserForm.phone} onChange={(event) => setManagedUserForm({ ...managedUserForm, phone: event.target.value })} placeholder="Phone" />
-                      <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={managedUserForm.role} onChange={(event) => setManagedUserForm({ ...managedUserForm, role: event.target.value })}>
-                        {managedRoleOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={managedUserForm.district} onChange={(event) => setManagedUserForm({ ...managedUserForm, district: event.target.value })} placeholder="District" />
-                      <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={managedUserForm.area} onChange={(event) => setManagedUserForm({ ...managedUserForm, area: event.target.value })} placeholder="Area / Block" />
-                      <select className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={managedUserForm.approvalStatus} onChange={(event) => setManagedUserForm({ ...managedUserForm, approvalStatus: event.target.value })}>
-                        {approvalOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <label className="flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-400">
-                        <input type="checkbox" checked={managedUserForm.isPhoneVerified} onChange={(event) => setManagedUserForm({ ...managedUserForm, isPhoneVerified: event.target.checked })} />
-                        Phone verified
-                      </label>
-                      <label className="flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-400">
-                        <input
-                          type="checkbox"
-                          checked={managedUserForm.isFunctionalityDisabled}
-                          onChange={(event) => setManagedUserForm({ ...managedUserForm, isFunctionalityDisabled: event.target.checked })}
-                        />
-                        Disable all newsroom actions
-                      </label>
-                      <div className="flex gap-3 md:col-span-2">
-                        <button type="button" onClick={() => saveManagedUser(managedUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
-                        <button type="button" onClick={() => setPendingManagedUserDelete(managedUser)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <p className="text-lg font-semibold text-white">{managedUser.fullName}</p>
-                        <p className="text-sm text-slate-500">{managedUser.phone} • {managedUser.email || "-"}</p>
-                        <p className="text-sm text-slate-500">{managedUser.district || "-"} • {managedUser.area || "-"}</p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{String(managedUser.role || "").replaceAll("_", " ")}</span>
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
-                              managedUser.approvalStatus === "approved"
-                                ? "bg-green-500/15 text-green-300"
-                                : managedUser.approvalStatus === "pending"
-                                  ? "bg-yellow-500/15 text-yellow-300"
-                                  : "bg-rose-500/15 text-rose-300"
-                            }`}
-                          >
-                            {managedUser.approvalStatus}
-                          </span>
-                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">{managedUser.isPhoneVerified ? "Phone Verified" : "Phone Pending"}</span>
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
-                              managedUser.isFunctionalityDisabled ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300"
-                            }`}
-                          >
-                            {managedUser.isFunctionalityDisabled ? "Actions Disabled" : "Actions Enabled"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {managedUser.approvalStatus === "pending" ? <button type="button" onClick={() => approveUser(managedUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Approve</button> : null}
-                        <button type="button" onClick={() => startEditManagedUser(managedUser)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">Edit</button>
-                        <button type="button" onClick={() => setPendingManagedUserDelete(managedUser)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {!visibleManagedUsers.length ? <p className="text-slate-500">No registered reporters or chief editors match your search.</p> : null}
-            </div>
-          </div>
-
-          <div className="panel p-6">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-2xl font-semibold text-white">Contact Us Messages</h2>
-              {editingContactId ? (
-                <button type="button" onClick={resetContactAdminForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
-                  Cancel Edit
-                </button>
-              ) : null}
-            </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px]">
-              <input
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-                placeholder="Search by name, email, phone, subject, or message"
-                value={contactSearch}
-                onChange={(event) => setContactSearch(event.target.value)}
-              />
-              <select
-                className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
-                value={contactStatusFilter}
-                onChange={(event) => setContactStatusFilter(event.target.value)}
-              >
-                {contactStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="mt-5 space-y-4">
-              {visibleContactMessages.map((contactMessage) => (
-                <div id={`contact-message-${contactMessage._id}`} key={contactMessage._id} className="rounded-2xl border border-white/10 p-4">
-                  {editingContactId === contactMessage._id ? (
-                    <div className="grid gap-4">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.fullName} readOnly />
-                        <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.email} readOnly />
-                        <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.phone || "Phone not provided"} readOnly />
-                        <input className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" value={contactMessage.subject} readOnly />
-                      </div>
-                      <textarea className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="5" value={contactMessage.message} readOnly />
-                      <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-                        <select
-                          className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
-                          value={contactAdminForm.status}
-                          onChange={(event) => setContactAdminForm({ ...contactAdminForm, status: event.target.value })}
-                        >
-                          {contactStatusOptions.filter((option) => option.value !== "all").map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                        <textarea
-                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-                          rows="3"
-                          placeholder="Admin note for follow-up, resolution, or internal handling"
-                          value={contactAdminForm.adminNote}
-                          onChange={(event) => setContactAdminForm({ ...contactAdminForm, adminNote: event.target.value })}
-                        />
-                      </div>
-                      <div className="flex gap-3">
-                        <button type="button" onClick={() => saveContactMessage(contactMessage._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
-                        <button type="button" onClick={() => deleteContactMessage(contactMessage._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="space-y-2">
-                        <p className="text-lg font-semibold text-white">{contactMessage.subject}</p>
-                        <p className="text-sm text-slate-500">{contactMessage.fullName} • {contactMessage.email} • {contactMessage.phone || "No phone provided"}</p>
-                        <p className="text-sm text-slate-400">{contactMessage.message}</p>
-                        {contactMessage.adminNote ? <p className="text-sm text-slate-500">Admin Note: {contactMessage.adminNote}</p> : null}
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
-                              contactMessage.status === "resolved"
-                                ? "bg-green-500/15 text-green-300"
-                                : contactMessage.status === "in_progress"
-                                  ? "bg-yellow-500/15 text-yellow-300"
-                                  : "bg-orange-500/15 text-orange-300"
-                            }`}
-                          >
-                            {String(contactMessage.status || "new").replaceAll("_", " ")}
-                          </span>
-                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">
-                            {formatDate(contactMessage.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => startEditContact(contactMessage)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">Edit</button>
-                        <button type="button" onClick={() => deleteContactMessage(contactMessage._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {!visibleContactMessages.length ? <p className="text-slate-500">No contact messages match your filters.</p> : null}
-            </div>
-          </div>
-
-          <div className="panel p-6">
-            <h2 className="text-2xl font-semibold text-white">News Publishing Queue</h2>
-            <input className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Search pending stories" value={pendingArticleSearch} onChange={(event) => setPendingArticleSearch(event.target.value)} />
-            <div className="mt-5 space-y-4">
-              {visiblePendingArticles.map((article) => (
-                <div key={article._id} className="rounded-2xl border border-white/10 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <p className="text-lg font-semibold text-white">{article.title}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {article.audioUrl ? (
-                        <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
-                      ) : null}
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
-                    </div>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">By {joinMetaParts(article.author?.fullName, article.district, article.area)}</p>
-                  <p className="mt-3 text-sm text-slate-400">{article.excerpt}</p>
-                  {article.coverImageUrl ? (
-                    <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
-                      <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" />
-                    </div>
-                  ) : null}
-                  {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
-                  <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="2" placeholder="Editorial feedback for rejection" value={feedbacks[`article-${article._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`article-${article._id}`]: event.target.value })} />
-                  <div className="mt-4 flex gap-3">
-                    <button type="button" onClick={() => approveArticle(article._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">Publish</button>
-                    <button type="button" onClick={() => rejectArticle(article._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Reject</button>
-                  </div>
-                </div>
-              ))}
-              {!visiblePendingArticles.length ? <p className="text-slate-500">No pending stories match your search.</p> : null}
-            </div>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <div id="advertisement-management-form" className="panel p-6">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-2xl font-semibold text-white">Advertisement Management</h2>
-                {editingAdId ? (
-                  <button type="button" onClick={resetAdForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">
-                    Cancel Edit
-                  </button>
-                ) : null}
-              </div>
-              <form onSubmit={submitAd} className="mt-5 grid gap-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Advertiser name" value={adForm.advertiserName} onChange={(event) => setAdForm({ ...adForm, advertiserName: event.target.value })} />
-                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Advertiser email" value={adForm.advertiserEmail} onChange={(event) => setAdForm({ ...adForm, advertiserEmail: event.target.value })} />
-                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Advertiser phone" value={adForm.advertiserPhone} onChange={(event) => setAdForm({ ...adForm, advertiserPhone: event.target.value })} />
-                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Company or brand name" value={adForm.companyName} onChange={(event) => setAdForm({ ...adForm, companyName: event.target.value })} />
-                </div>
-                <div>
-                  <input id="advertisement-title-input" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Campaign title, for example Palamu Trade Fair 2026" value={adForm.title} onChange={(event) => setAdForm({ ...adForm, title: event.target.value })} />
-                  <p className="mt-2 text-xs text-slate-500">Use a short sponsor title that is easy to recognize on the homepage.</p>
-                </div>
-                <div>
-                  <textarea className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="3" placeholder="Optional short sponsor summary for homepage cards" value={adForm.description} onChange={(event) => setAdForm({ ...adForm, description: event.target.value })} />
-                  <p className="mt-2 text-xs text-slate-500">Keep this to one or two lines so the sponsored panel stays clean and readable.</p>
-                </div>
-                <ImagePicker
-                  label="Advertisement Banner Upload"
-                  helpText="Upload a sponsor banner here, or leave this empty and paste a direct banner image URL below."
-                  value={adForm.imageUrl}
-                  onChange={(value) => setAdForm({ ...adForm, imageUrl: value })}
-                />
-                <div>
-                  <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Optional banner URL, for example https://example.com/banner.jpg" value={adForm.imageUrl.startsWith("data:") ? "" : adForm.imageUrl} onChange={(event) => setAdForm({ ...adForm, imageUrl: event.target.value })} />
-                  <p className="mt-2 text-xs text-slate-500">Use this when the sponsor already hosts the banner online. Upload and URL are interchangeable; one banner source is enough.</p>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <input type="url" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Sponsor destination URL, for example https://example.com/offer" value={adForm.targetUrl} onChange={(event) => setAdForm({ ...adForm, targetUrl: event.target.value })} />
-                    <p className="mt-2 text-xs text-slate-500">Readers are taken here after clicking the ad.</p>
-                  </div>
-                  <div>
-                    <input className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="CTA label, for example View Offer" value={adForm.ctaLabel} onChange={(event) => setAdForm({ ...adForm, ctaLabel: event.target.value })} />
-                    <p className="mt-2 text-xs text-slate-500">Short button text works best.</p>
-                  </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <select className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={adForm.placement} onChange={(event) => setAdForm({ ...adForm, placement: event.target.value })}>
-                      {adPlacements.map((placement) => (
-                        <option key={placement.value} value={placement.value}>
-                          {placement.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-xs text-slate-500">{selectedPlacement?.hint}</p>
-                  </div>
-                  <div>
-                    <select className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white" value={adForm.status} onChange={(event) => setAdForm({ ...adForm, status: event.target.value })}>
-                      {adStatuses.map((status) => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-xs text-slate-500">Use Pending Approval for paid requests waiting on review, or Active to publish immediately.</p>
-                  </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <input type="number" min="1" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Duration in days" value={adForm.durationDays} onChange={(event) => setAdForm({ ...adForm, durationDays: Number(event.target.value) })} />
-                    <p className="mt-2 text-xs text-slate-500">How long the ad should stay active once published.</p>
-                  </div>
-                  <div>
-                    <input type="number" min="0" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Price in INR" value={adForm.amount} onChange={(event) => setAdForm({ ...adForm, amount: Number(event.target.value) })} />
-                    <p className="mt-2 text-xs text-slate-500">Internal campaign price or billing amount.</p>
-                  </div>
-                  <div>
-                    <input type="number" min="1" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" placeholder="Priority, lower means higher" value={adForm.priority} onChange={(event) => setAdForm({ ...adForm, priority: Number(event.target.value) })} />
-                    <p className="mt-2 text-xs text-slate-500">Priority decides ordering inside the selected homepage placement.</p>
-                  </div>
-                </div>
-                <div>
-                  <textarea className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="3" placeholder="Optional internal notes or advertiser remarks" value={adForm.notes} onChange={(event) => setAdForm({ ...adForm, notes: event.target.value })} />
-                  <p className="mt-2 text-xs text-slate-500">Useful for approval notes, invoice references, or campaign instructions.</p>
-                </div>
-                <button className="rounded-2xl bg-orange-500 px-4 py-3 font-semibold text-white">{busyAction ? "Saving..." : editingAdId ? "Update Advertisement" : "Publish Advertisement"}</button>
-              </form>
-
-              <div className="mt-8 border-t border-white/10 pt-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-white">Manage All Ads</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Filter advertisements by date, status, or advertiser and then edit or delete any single campaign.
-                    </p>
-                  </div>
-                  <div className="text-sm text-slate-400">
-                    <span className="font-semibold text-white">{visibleManagedAds.length}</span> ad{visibleManagedAds.length === 1 ? "" : "s"} match the current filters.
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
-                  <input
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-                    placeholder="Search by title, advertiser, company, email"
-                    value={adSearch}
-                    onChange={(event) => setAdSearch(event.target.value)}
-                  />
-                  <select
-                    className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
-                    value={adStatusFilter}
-                    onChange={(event) => setAdStatusFilter(event.target.value)}
-                  >
-                    <option value="all">All statuses</option>
-                    {adStatuses.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-                    value={adDateFilter}
-                    onChange={(event) => setAdDateFilter(event.target.value)}
-                  />
-                </div>
-
-                <div className="mt-5 space-y-4">
-                  {visibleManagedAds.map((ad) => (
-                    <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                      {ad.imageUrl ? (
-                        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-                          <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-contain" />
-                        </div>
-                      ) : null}
-                      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-lg font-semibold text-white">{ad.title}</p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {adPlacements.find((placement) => placement.value === ad.placement)?.label || ad.placement}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{ad.status}</span>
-                          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">{ad.paymentStatus || "pending"}</span>
-                        </div>
-                      </div>
-                      {ad.description ? <p className="mt-3 text-sm leading-6 text-slate-400">{ad.description}</p> : null}
-                      <div className="mt-4 grid gap-2 text-sm text-slate-500 md:grid-cols-2">
-                        <p>Advertiser: {ad.advertiserName || "-"}</p>
-                        <p>Company: {ad.companyName || "-"}</p>
-                        <p>Email: {ad.advertiserEmail || "-"}</p>
-                        <p>Payer Account Email: {ad.advertiser?.email || ad.advertiserEmail || "-"}</p>
-                        <p>Phone: {ad.advertiserPhone || "-"}</p>
-                        <p>Priority: {ad.priority}</p>
-                        <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
-                        <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
-                        <p>Activity Date: {formatDate(getAdvertisementActivityDate(ad))}</p>
-                        <p>Created At: {formatDateTime(ad.createdAt)}</p>
-                        <p>Paid At: {formatDateTime(ad.paidAt)}</p>
-                        <p>Reviewed At: {formatDateTime(ad.reviewedAt)}</p>
-                        <p>Reviewed By: {ad.reviewedBy?.fullName || "-"}</p>
-                        <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
-                        <p className="md:col-span-2 break-all font-mono text-xs text-slate-400">Razorpay Order ID: {ad.razorpayOrderId || "-"}</p>
-                        <p className="md:col-span-2 break-all font-mono text-xs text-slate-400">Razorpay Payment ID: {ad.razorpayPaymentId || "-"}</p>
-                        <p className="md:col-span-2 break-all font-mono text-xs text-slate-400">Razorpay Signature: {ad.razorpaySignature || "-"}</p>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => setPendingAdDelete(ad)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
-                          Delete
-                        </button>
-                        {ad.status === "pending_approval" ? (
-                          <button type="button" onClick={() => approveAd(ad._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">
-                            Approve
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                  {!visibleManagedAds.length ? <p className="text-slate-500">No advertisements match the current filters.</p> : null}
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      ) : null}
-
-      {user?.role === "super_admin" ? (
-        <>
-          {showAdRequestsPanel ? (
-            <div className="fixed inset-0 z-[85] flex justify-end bg-slate-950/70 px-4 py-4 backdrop-blur-sm">
-              <div className="voice-desk-scroll w-full max-w-2xl rounded-[32px] border border-white/10 bg-slate-950/95 p-6 shadow-[0_32px_80px_rgba(15,23,42,0.45)]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300">Super Admin Queue</p>
-                    <h2 className="mt-3 text-2xl font-semibold text-white">Advertisement Requests</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Only pending paid advertisement requests appear here for final super admin review.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdRequestsPanel(false)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:border-white/20 hover:text-white"
-                    aria-label="Close advertisement requests panel"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                <div className="mt-6 space-y-4">
-                  {reviewableAds.map((ad) => (
-                    <div key={ad._id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                      {ad.imageUrl ? (
-                        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-                          <img src={ad.imageUrl} alt={ad.title} className="aspect-[16/9] w-full object-contain" />
-                        </div>
-                      ) : null}
-                      <div className="mt-4 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-white">{ad.title}</p>
-                          <p className="mt-1 text-sm text-slate-500">{adPlacements.find((placement) => placement.value === ad.placement)?.label || ad.placement}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{ad.status}</span>
-                          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">{ad.paymentStatus || "pending"}</span>
-                        </div>
-                      </div>
-                      {ad.description ? <p className="mt-3 text-sm leading-6 text-slate-400">{ad.description}</p> : null}
-                      <div className="mt-4 grid gap-2 text-sm text-slate-500">
-                        <p>Advertiser: {ad.advertiserName || "-"}</p>
-                        <p>Email: {ad.advertiserEmail || "-"}</p>
-                        <p>Payer Account Email: {ad.advertiser?.email || ad.advertiserEmail || "-"}</p>
-                        <p>Phone: {ad.advertiserPhone || "-"}</p>
-                        <p>Company: {ad.companyName || "-"}</p>
-                        <p>Priority: {ad.priority}</p>
-                        <p>Duration: {ad.durationDays} day{ad.durationDays > 1 ? "s" : ""}</p>
-                        <p>Price: Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}</p>
-                        <p>Target URL: {ad.targetUrl || "Not provided"}</p>
-                        <p>Created At: {formatDateTime(ad.createdAt)}</p>
-                        <p>Paid At: {formatDateTime(ad.paidAt)}</p>
-                        <p>Reviewed At: {formatDateTime(ad.reviewedAt)}</p>
-                        <p>Reviewed By: {ad.reviewedBy?.fullName || "-"}</p>
-                        <p>Runs: {formatDate(ad.startsAt)} to {formatDate(ad.endsAt)}</p>
-                        <p className="break-all font-mono text-xs text-slate-400">Razorpay Order ID: {ad.razorpayOrderId || "-"}</p>
-                        <p className="break-all font-mono text-xs text-slate-400">Razorpay Payment ID: {ad.razorpayPaymentId || "-"}</p>
-                        <p className="break-all font-mono text-xs text-slate-400">Razorpay Signature: {ad.razorpaySignature || "-"}</p>
-                        {ad.notes ? <p>Notes: {ad.notes}</p> : null}
-                        {ad.rejectionReason ? <p>Review note: {ad.rejectionReason}</p> : null}
-                      </div>
-                      {ad.status === "pending_approval" ? (
-                        <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white" rows="2" placeholder="Optional approval or rejection note" value={feedbacks[`ad-${ad._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`ad-${ad._id}`]: event.target.value })} />
-                      ) : null}
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        {ad.status === "pending_approval" ? (
-                          <button type="button" onClick={() => approveAd(ad._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white">
-                            Approve & Publish
-                          </button>
-                        ) : null}
-                        {ad.status === "pending_approval" ? (
-                          <button type="button" onClick={() => rejectAd(ad._id)} className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white">
-                            Reject
-                          </button>
-                        ) : null}
-                        <button type="button" onClick={() => startEditAd(ad)} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900">
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => setPendingAdDelete(ad)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {!reviewableAds.length ? <p className="text-slate-500">No pending paid advertisement requests are available right now.</p> : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </>
-      ) : null}
-        </>
-      )}
+      </main>
     </div>
   );
 };

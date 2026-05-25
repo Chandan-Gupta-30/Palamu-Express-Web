@@ -87,6 +87,7 @@ const buildArticlePayload = async (body) => {
       audioTranscript,
       district: String(body.district || "").trim(),
       area: String(body.area || "").trim(),
+      panchayat: String(body.panchayat || "").trim(),
       breaking: Boolean(body.breaking),
       tags: Array.isArray(body.tags) ? body.tags : undefined,
     },

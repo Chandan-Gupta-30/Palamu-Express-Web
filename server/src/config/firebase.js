@@ -87,6 +87,68 @@ const createMockFileRef = (fileName) => ({
   publicUrl: () => `https://storage.googleapis.com/mock-bucket/${fileName}`,
 });
 
+const cacheStore = {};
+const CACHE_TTL_MS = 60 * 1000; // Cache Firestore collections for 60 seconds
+
+const invalidateCache = (colName) => {
+  if (cacheStore[colName]) {
+    delete cacheStore[colName];
+    console.log(`[Cache Invalidation] Cleared cache for collection "${colName}"`);
+  }
+};
+
+const wrapFirestoreDbWithCaching = (rawDb) => {
+  return {
+    collection: (colName) => {
+      const rawCollection = rawDb.collection(colName);
+
+      return {
+        get: async () => {
+          const now = Date.now();
+          const cached = cacheStore[colName];
+          if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+            console.log(`[Cache Hit] Serving documents from cache for collection "${colName}"`);
+            return cached.snapshot;
+          }
+
+          console.log(`[Cache Miss] Fetching fresh documents from Firestore for collection "${colName}"`);
+          const snapshot = await rawCollection.get();
+          cacheStore[colName] = {
+            snapshot,
+            timestamp: now,
+          };
+          return snapshot;
+        },
+
+        doc: (docId) => {
+          const rawDoc = docId ? rawCollection.doc(docId) : rawCollection.doc();
+          return {
+            id: rawDoc.id,
+            get: () => rawDoc.get(),
+            set: async (data, options) => {
+              invalidateCache(colName);
+              return await rawDoc.set(data, options);
+            },
+            update: async (data) => {
+              invalidateCache(colName);
+              return await rawDoc.update(data);
+            },
+            delete: async () => {
+              invalidateCache(colName);
+              return await rawDoc.delete();
+            },
+          };
+        },
+
+        add: async (data) => {
+          invalidateCache(colName);
+          return await rawCollection.add(data);
+        },
+      };
+    },
+  };
+};
+
 const initializeFirebase = () => {
   if (isFirebaseInitialized) return { db, bucket };
 
@@ -125,7 +187,9 @@ const initializeFirebase = () => {
         storageBucket: bucketName,
         projectId: projectId,
       });
-      db = admin.firestore();
+      const rawDb = admin.firestore();
+      rawDb.settings({ ignoreUndefinedProperties: true });
+      db = wrapFirestoreDbWithCaching(rawDb);
       bucket = admin.storage().bucket();
       isFirebaseInitialized = true;
       console.log(`[Firebase] Connected successfully to project "${projectId}" and bucket "${bucketName}" using service account.`);
@@ -133,6 +197,7 @@ const initializeFirebase = () => {
       console.error("[Firebase] Error initializing admin SDK with service account:", error.message);
     }
   }
+
 
   if (!isFirebaseInitialized) {
     console.warn("\n==========================================================================");

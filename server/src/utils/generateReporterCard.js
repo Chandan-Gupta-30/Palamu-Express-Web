@@ -42,6 +42,18 @@ export const generateStaffCardBuffer = async (user) => {
   const isChiefEditor = user.role === roles.CHIEF_EDITOR;
   const staffCode = isChiefEditor ? user.chiefEditorCode || "PENDING" : user.reporterCode || "PENDING";
 
+  // Fetch Global Expiry settings if available
+  let globalIdCardExpiry = "";
+  try {
+    const { db } = await import("../config/firebase.js");
+    const configSnap = await db.collection("settings").doc("global_config").get();
+    if (configSnap.exists) {
+      globalIdCardExpiry = configSnap.get("globalIdCardExpiry") || "";
+    }
+  } catch (err) {
+    console.error("[generateStaffCardBuffer] Error fetching global settings:", err.message);
+  }
+
   const [photoBuffer, qrBuffer] = await Promise.all([
     resolvePhotoBuffer(user),
     resolveQrBuffer(staffCode)
@@ -143,45 +155,61 @@ export const generateStaffCardBuffer = async (user) => {
       20, 26, { width: 310, align: "center", lineGap: 3.5 }
     );
 
-    // QR Code on Left (Scan to Verify)
-    const qrX = 50;
-    const qrY = 82;
-    const qrSize = 54;
+    // QR Code 1: Scan to Verify (Left)
+    const qrX = 35;
+    const qrY = 80;
+    const qrSize = 56;
     doc.roundedRect(qrX, qrY, qrSize, qrSize, 4).fill("#ffffff");
 
     if (qrBuffer) {
       try {
         doc.image(qrBuffer, qrX + 2, qrY + 2, { fit: [qrSize - 4, qrSize - 4], align: "center", valign: "center" });
       } catch {
-        doc.fillColor("#ef4444").font("Helvetica-Bold").fontSize(5).text("QR ERROR", qrX, qrY + 22, { width: qrSize, align: "center" });
+        doc.fillColor("#ef4444").font("Helvetica-Bold").fontSize(5.5).text("QR ERROR", qrX, qrY + 22, { width: qrSize, align: "center" });
       }
     } else {
-      doc.fillColor("#64748b").font("Helvetica-Bold").fontSize(5).text("NO QR", qrX, qrY + 22, { width: qrSize, align: "center" });
+      doc.fillColor("#64748b").font("Helvetica-Bold").fontSize(5.5).text("NO QR", qrX, qrY + 22, { width: qrSize, align: "center" });
     }
 
-    doc.fillColor("#ea580c").font("Helvetica-Bold").fontSize(5.5).text("SCAN TO VERIFY", qrX, qrY + qrSize + 4, { width: qrSize, align: "center" });
+    doc.fillColor("#ea580c").font("Helvetica-Bold").fontSize(6).text("SCAN TO VERIFY", qrX - 5, qrY + qrSize + 5, { width: qrSize + 10, align: "center" });
 
-    // Barcode Container on Right
-    const barcodeX = 140;
-    const barcodeY = 82;
-    const barcodeWidth = 160;
-    const barcodeHeight = 32;
-    doc.roundedRect(barcodeX, barcodeY, barcodeWidth, barcodeHeight, 3).fill("#ffffff");
+    // Vertical Divider
+    doc.moveTo(115, 75).lineTo(115, 155).lineWidth(0.5).stroke("#1e293b");
 
-    // Draw realistic barcode stripes using loop
-    const stripes = [2, 1, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 4, 2, 1, 3, 1, 2, 4, 2, 1, 3, 1, 2, 2, 1, 3, 1, 4, 2];
-    doc.fillColor("#000000");
-    let currentBarcodeX = barcodeX + 10;
-    for (let i = 0; i < stripes.length; i++) {
-      const width = stripes[i];
-      if (i % 2 === 0) {
-        doc.rect(currentBarcodeX, barcodeY + 4, width, barcodeHeight - 8).fill("#000000");
+    // Right Side: Details Grid
+    const accreditedYear = user.createdAt ? new Date(user.createdAt).getFullYear() : 2026;
+    
+    // Parse validUpto date to DD-MM-YYYY format
+    let expiryDateValue = user.validUpto || globalIdCardExpiry;
+    let validUptoLabel = `31-12-${accreditedYear + 1}`;
+    if (expiryDateValue) {
+      try {
+        const validDate = new Date(expiryDateValue);
+        const day = String(validDate.getDate()).padStart(2, "0");
+        const month = String(validDate.getMonth() + 1).padStart(2, "0");
+        const year = validDate.getFullYear();
+        validUptoLabel = `${day}-${month}-${year}`;
+      } catch (err) {
+        console.error("Failed to parse validUpto/global expiry date in PDF generation", err.message);
       }
-      currentBarcodeX += width + 2;
     }
 
-    // Monospaced Code Text
-    doc.fillColor("#94a3b8").font("Courier-Bold").fontSize(8).text(staffCode, barcodeX, barcodeY + barcodeHeight + 4, { width: barcodeWidth, align: "center" });
+    doc.font("Helvetica").fontSize(7.5);
+
+    doc.fillColor("#94a3b8").text("ACCREDITED SINCE:", 135, 76);
+    doc.fillColor("#f8fafc").font("Helvetica-Bold").text(accreditedYear, 230, 76);
+
+    doc.font("Helvetica").fillColor("#94a3b8").text("VALID UPTO:", 135, 92);
+    doc.fillColor("#ea580c").font("Helvetica-Bold").text(validUptoLabel, 230, 92);
+
+    doc.font("Helvetica").fillColor("#94a3b8").text("BLOOD GROUP:", 135, 108);
+    doc.fillColor("#f8fafc").font("Helvetica-Bold").text(user.bloodGroup || "O+", 230, 108);
+
+    doc.font("Helvetica").fillColor("#94a3b8").text("EMERGENCY CALL:", 135, 124);
+    doc.fillColor("#f8fafc").font("Helvetica-Bold").text(user.phone || "-", 230, 124);
+
+    doc.font("Helvetica").fillColor("#94a3b8").text("OFFICIAL EMAIL:", 135, 140);
+    doc.fillColor("#f8fafc").font("Helvetica-Bold").text("desk@palamuexpress.in", 230, 140);
 
     // Footer Jurisdiction banner
     doc.rect(6, 186, 338, 28).fill("#1e293b");

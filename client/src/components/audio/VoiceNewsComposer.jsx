@@ -51,15 +51,22 @@ const DictationButton = ({ active, disabled, onClick }) => (
     type="button"
     disabled={disabled}
     onClick={onClick}
-    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition ${
+    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition-all duration-300 ${
       active
-        ? "border-red-400/70 bg-red-500/20 text-red-100"
+        ? "border-red-500/50 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.25)] text-red-400"
         : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20 hover:text-white"
     } disabled:cursor-not-allowed disabled:opacity-40`}
     aria-label={active ? "Stop browser dictation" : "Start browser dictation"}
     title={active ? "Stop browser dictation" : "Start browser dictation"}
   >
-    <Mic size={16} />
+    <Mic 
+      size={16} 
+      className={`transition-all duration-300 ${
+        active 
+          ? "text-red-500 fill-red-500/20 animate-[pulse_1.5s_infinite]" 
+          : "text-inherit"
+      }`} 
+    />
   </button>
 );
 
@@ -506,7 +513,11 @@ export const VoiceNewsComposer = ({
               <div className="mt-8 rounded-[28px] border border-emerald-300/25 bg-emerald-500/10 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span className={`inline-flex h-12 w-12 items-center justify-center rounded-full ${recording ? "bg-red-600 text-white" : "bg-white/10 text-emerald-300"}`}>
+                    <span className={`inline-flex h-12 w-12 items-center justify-center rounded-full transition-all duration-300 ${
+                      recording 
+                        ? "bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-[pulse_1.8s_infinite]" 
+                        : "bg-white/10 text-emerald-300"
+                    }`}>
                       {recording ? <Radio size={18} /> : <Mic size={18} />}
                     </span>
                     <div>
