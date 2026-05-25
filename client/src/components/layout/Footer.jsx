@@ -30,7 +30,7 @@ export const Footer = () => (
             and a publishing desk built for fast and credible regional journalism.
           </p>
           <p className="max-w-xl text-sm leading-7 text-slate-400">
-            Palamu Express is owned and operated or managed by Chandan Gupta.
+            Palamu Express is owned and operated or managed by Palamu Express Digital Media.
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
