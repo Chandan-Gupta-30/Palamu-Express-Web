@@ -3,6 +3,7 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import { isFirebaseInitialized, db } from "../config/firebase.js";
 import { User } from "../models/User.js";
+import { Notification } from "../models/Notification.js";
 import { signToken } from "../utils/jwt.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { approvalStatuses, roles } from "../utils/constants.js";
@@ -170,6 +171,23 @@ export const register = asyncHandler(async (req, res) => {
     bloodGroup: bloodGroup || "O+",
     education: education || "",
   });
+
+  if ([roles.REPORTER, roles.CHIEF_EDITOR].includes(role)) {
+    try {
+      const newNotif = await Notification.create({
+        userId: "all",
+        title: "New Onboarding Request",
+        message: `${fullName} is requesting onboarding approval as a ${role === roles.CHIEF_EDITOR ? "Chief Editor" : "Reporter"} in ${district} | ${area}.`,
+        type: "broadcast",
+        senderId: String(user._id),
+        createdAt: Date.now(),
+        onboardingUserId: String(user._id),
+      });
+      req.io?.emit("notification:received", { notification: newNotif });
+    } catch (notifErr) {
+      console.error("Failed to trigger onboarding notification:", notifErr);
+    }
+  }
 
   res.status(StatusCodes.CREATED).json({
     message: "Registration submitted successfully.",

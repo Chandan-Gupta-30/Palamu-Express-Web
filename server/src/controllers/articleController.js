@@ -1,6 +1,7 @@
 import { StatusCodes } from "http-status-codes";
 import { Article } from "../models/Article.js";
 import { Analytics } from "../models/Analytics.js";
+import { Notification } from "../models/Notification.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { approvalStatuses, articleStatuses, roles, articleCategories } from "../utils/constants.js";
 import { generateVoiceDraft, summarizeArticle } from "../services/geminiService.js";
@@ -138,6 +139,23 @@ export const createArticle = asyncHandler(async (req, res) => {
     editorFeedback: "",
   });
 
+  if (article.status === articleStatuses.PENDING) {
+    try {
+      const newNotif = await Notification.create({
+        userId: "all",
+        title: "New News Submission",
+        message: `"${article.title}" by ${req.user.fullName} is pending review.`,
+        type: "broadcast",
+        senderId: String(req.user._id),
+        createdAt: Date.now(),
+        articleId: String(article._id),
+      });
+      req.io?.emit("notification:received", { notification: newNotif });
+    } catch (notifErr) {
+      console.error("Failed to trigger article submission notification:", notifErr);
+    }
+  }
+
   res.status(StatusCodes.CREATED).json({ article });
 });
 
@@ -178,6 +196,23 @@ export const updateArticle = asyncHandler(async (req, res) => {
     return res.status(StatusCodes.NOT_FOUND).json({
       message: isPrivilegedPublisher ? "Article not found" : "You can update only your own articles",
     });
+  }
+
+  if (article.status === articleStatuses.PENDING) {
+    try {
+      const newNotif = await Notification.create({
+        userId: "all",
+        title: "News Submission Updated",
+        message: `"${article.title}" by ${req.user.fullName} has been updated and is pending review.`,
+        type: "broadcast",
+        senderId: String(req.user._id),
+        createdAt: Date.now(),
+        articleId: String(article._id),
+      });
+      req.io?.emit("notification:received", { notification: newNotif });
+    } catch (notifErr) {
+      console.error("Failed to trigger article update notification:", notifErr);
+    }
   }
 
   res.json({ article });

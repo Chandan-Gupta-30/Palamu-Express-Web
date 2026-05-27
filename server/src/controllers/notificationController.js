@@ -36,6 +36,8 @@ export const getNotifications = asyncHandler(async (req, res) => {
       senderId: notif.senderId,
       createdAt: notif.createdAt,
       isRead,
+      articleId: notif.articleId,
+      onboardingUserId: notif.onboardingUserId,
     };
   });
 

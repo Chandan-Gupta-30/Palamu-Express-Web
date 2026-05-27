@@ -311,6 +311,9 @@ export const DashboardPage = () => {
   const [selectedManagedUser, setSelectedManagedUser] = useState(null);
   const [managedUserStatusFilter, setManagedUserStatusFilter] = useState("all");
   const [pendingArticleSearch, setPendingArticleSearch] = useState("");
+  const [pendingArticlePage, setPendingArticlePage] = useState(1);
+  const [pendingArticlePageSize, setPendingArticlePageSize] = useState(5);
+  const [expandedArticleId, setExpandedArticleId] = useState(null);
   const [contactMessages, setContactMessages] = useState([]);
   const [contactSearch, setContactSearch] = useState("");
   const [contactStatusFilter, setContactStatusFilter] = useState("all");
@@ -489,6 +492,11 @@ export const DashboardPage = () => {
       .toLowerCase()
       .includes(pendingArticleSearch.toLowerCase())
   );
+  const totalPendingArticlePages = Math.ceil(visiblePendingArticles.length / pendingArticlePageSize) || 1;
+  const pagedPendingArticles = useMemo(() => {
+    const startIndex = (pendingArticlePage - 1) * pendingArticlePageSize;
+    return visiblePendingArticles.slice(startIndex, startIndex + pendingArticlePageSize);
+  }, [visiblePendingArticles, pendingArticlePage, pendingArticlePageSize]);
   const visibleContactMessages = contactMessages.filter((message) => {
     const matchesSubTab = inboxSubTab === "journalist" ? Boolean(message.userId) : !message.userId;
     const matchesStatus = contactStatusFilter === "all" || message.status === contactStatusFilter;
@@ -2478,6 +2486,42 @@ export const DashboardPage = () => {
     }
   };
 
+  const handleNotificationClick = async (notif) => {
+    try {
+      if (!notif.isRead) {
+        await handleMarkRead(notif._id);
+      }
+      setShowNotificationsDropdown(false);
+
+      if (notif.articleId) {
+        setActiveTab("queue");
+        setExpandedArticleId(notif.articleId);
+        setPendingArticleSearch("");
+        setPendingArticlePage(1);
+      } else if (notif.onboardingUserId) {
+        setActiveTab("approvals");
+        setPendingUserSearch("");
+      } else if (
+        String(notif.title || "").toLowerCase().includes("article") || 
+        String(notif.title || "").toLowerCase().includes("news") || 
+        String(notif.message || "").toLowerCase().includes("pending review")
+      ) {
+        setActiveTab("queue");
+        setPendingArticleSearch("");
+        setPendingArticlePage(1);
+      } else if (
+        String(notif.title || "").toLowerCase().includes("onboarding") || 
+        String(notif.title || "").toLowerCase().includes("kyc") || 
+        String(notif.message || "").toLowerCase().includes("onboarding approval")
+      ) {
+        setActiveTab("approvals");
+        setPendingUserSearch("");
+      }
+    } catch (err) {
+      console.error("Failed handling notification click redirection:", err);
+    }
+  };
+
   const handleMarkAllRead = async () => {
     try {
       await http.post("/notifications/mark-all-read");
@@ -4011,40 +4055,344 @@ export const DashboardPage = () => {
 
   const renderQueue = () => {
     return (
-      <div className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
-        <div className="border-b border-white/5 pb-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Editorial Review Queue</p>
-          <h2 className="text-2xl font-bold text-white mt-1">News Publishing Queue</h2>
-        </div>
-        <input className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Search pending stories" value={pendingArticleSearch} onChange={(event) => setPendingArticleSearch(event.target.value)} />
-        <div className="mt-5 space-y-4">
-          {visiblePendingArticles.map((article) => (
-            <div key={article._id} className="rounded-2xl border border-white/10 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <p className="text-lg font-semibold text-white">{article.title}</p>
-                <div className="flex flex-wrap gap-2">
-                  {article.audioUrl ? (
-                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-300">voice</span>
-                  ) : null}
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-orange-300">{article.status}</span>
+      <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
+        <div className="panel p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/5 pb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Editorial Review Queue</p>
+              <h2 className="text-2xl font-bold text-white mt-1">News Publishing Queue</h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search pending stories..."
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white outline-none focus:border-orange-500/80 focus:ring-4 focus:ring-orange-500/10 w-full sm:w-60 transition"
+                value={pendingArticleSearch}
+                onChange={(e) => {
+                  setPendingArticleSearch(e.target.value);
+                  setPendingArticlePage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Tabular CMS Interface */}
+          <div className="mt-6 overflow-hidden rounded-2xl border border-white/5 bg-slate-900/10 backdrop-blur-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/[0.02]">
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Article Details</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Reporter</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Category</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Submission Date</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Format</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {pagedPendingArticles.map((article) => {
+                    const isExpanded = expandedArticleId === article._id;
+                    const getCategoryStyles = (category) => {
+                      switch (category) {
+                        case "politics": return "bg-orange-500/10 text-orange-400 border-orange-500/20";
+                        case "crime": return "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                        case "sports": return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                        case "business": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+                        case "agriculture": return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                        case "education": return "bg-violet-500/10 text-violet-400 border-violet-500/20";
+                        case "public_grievances": return "bg-red-500/10 text-red-400 border-red-500/20";
+                        case "health": return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
+                        case "technology": return "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20";
+                        default: return "bg-slate-500/10 text-slate-400 border-slate-500/20";
+                      }
+                    };
+
+                    const badgeStyle = getCategoryStyles(article.category);
+                    
+                    return (
+                      <>
+                        <tr 
+                          key={article._id} 
+                          onClick={() => setExpandedArticleId(isExpanded ? null : article._id)}
+                          className={`hover:bg-white/[0.01] transition duration-150 group cursor-pointer ${isExpanded ? "bg-white/[0.02]" : ""}`}
+                        >
+                          {/* Column 1: Article details (Cover Image + Title) */}
+                          <td className="px-6 py-4 max-w-sm">
+                            <div className="flex items-center gap-3">
+                              <div className="relative shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-slate-950/60 border border-white/5 flex items-center justify-center">
+                                {article.coverImageUrl ? (
+                                  <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="h-full w-full bg-gradient-to-br from-orange-500/20 via-slate-800 to-slate-900 flex items-center justify-center">
+                                    <FileText className="h-5 w-5 text-orange-400/40" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-white group-hover:text-orange-400 transition truncate text-sm line-clamp-1">
+                                  {article.title}
+                                </h4>
+                                <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                  <MapPin size={10} className="text-slate-600 shrink-0" />
+                                  <span className="truncate max-w-[200px]">
+                                    {[article.district, article.area].filter(Boolean).join(" • ") || "-"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Column 2: Reporter Details */}
+                          <td className="px-6 py-4">
+                            <div className="text-xs text-slate-300 font-semibold truncate max-w-[150px]">
+                              {article.author?.fullName || "Journalist"}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              {article.author?.phone || "-"}
+                            </div>
+                          </td>
+
+                          {/* Column 3: Category */}
+                          <td className="px-6 py-4">
+                            {article.category ? (
+                              <span className={`inline-block rounded px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${badgeStyle}`}>
+                                {newsCategoryLabels[article.category] || article.category}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-500 italic">Uncategorized</span>
+                            )}
+                          </td>
+
+                          {/* Column 4: Submission date */}
+                          <td className="px-6 py-4">
+                            <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                              <Calendar size={12} className="text-slate-500" />
+                              {formatDateTime(article.createdAt)}
+                            </div>
+                          </td>
+
+                          {/* Column 5: Format */}
+                          <td className="px-6 py-4">
+                            {article.audioUrl ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-400" title="Audio / Voice news story">
+                                <Mic size={10} /> Voice
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-400" title="Written article">
+                                <FileText size={10} /> Standard
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Column 6: Action triggers */}
+                          <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedArticleId(isExpanded ? null : article._id)}
+                                className={`flex h-8 w-8 items-center justify-center rounded-full border border-white/10 transition ${isExpanded ? "bg-orange-500 text-white border-orange-500" : "bg-white/5 text-slate-300 hover:border-white/20 hover:text-white"}`}
+                                title={isExpanded ? "Collapse Details" : "Expand for Review"}
+                              >
+                                <Sliders size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => approveArticle(article._id)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600/10 border border-emerald-500/20 text-emerald-400 transition hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
+                                title="Approve & Publish Story"
+                              >
+                                <Check size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Collapsible Row Expansion */}
+                        {isExpanded && (
+                          <tr key={article._id + "-expanded"} className="bg-slate-950/40">
+                            <td colSpan="6" className="px-6 py-6 border-b border-white/5">
+                              <div className="grid gap-6 lg:grid-cols-3 animate-[fadeIn_0.3s_ease-out]">
+                                {/* Cover Photo & Metadata Block */}
+                                <div className="lg:col-span-1 space-y-4">
+                                  {article.coverImageUrl ? (
+                                    <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 border border-white/5">
+                                      <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-cover" />
+                                    </div>
+                                  ) : (
+                                    <div className="aspect-[16/10] w-full rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border border-white/5 flex flex-col items-center justify-center text-slate-600 p-4">
+                                      <FileText size={32} className="text-orange-500/20 mb-2 animate-pulse" />
+                                      <p className="text-xs font-semibold text-slate-500">No cover image uploaded</p>
+                                    </div>
+                                  )}
+                                  
+                                  {article.audioUrl && (
+                                    <div className="panel p-4 bg-slate-900/50 border border-white/5 space-y-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                        <Mic size={12} /> Embedded Audio Bulletin
+                                      </p>
+                                      <AudioStoryPlayer article={article} compact={false} className="w-full" />
+                                    </div>
+                                  )}
+
+                                  {/* Story Metadata rows */}
+                                  <div className="panel p-4 bg-slate-900/30 border border-white/5 text-xs space-y-2.5">
+                                    <div className="flex justify-between border-b border-white/5 pb-2">
+                                      <span className="text-slate-500">Reporter:</span>
+                                      <span className="font-semibold text-white">{article.author?.fullName || "Unassigned"}</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-white/5 pb-2">
+                                      <span className="text-slate-500">District Focus:</span>
+                                      <span className="font-semibold text-orange-400">{article.district || "Jharkhand"}</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-white/5 pb-2">
+                                      <span className="text-slate-500">Block / Area:</span>
+                                      <span className="font-semibold text-white">{article.area || "-"}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500">Category Tag:</span>
+                                      <span className="font-bold text-white uppercase tracking-wider">{newsCategoryLabels[article.category] || article.category}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Full Story Text Viewer */}
+                                <div className="lg:col-span-2 flex flex-col justify-between space-y-5">
+                                  <div className="space-y-4">
+                                    <div>
+                                      <h3 className="text-lg font-bold text-white font-display leading-tight">{article.title}</h3>
+                                      {article.excerpt && (
+                                        <p className="mt-2 text-xs text-slate-400 bg-white/[0.01] border border-white/5 p-3 rounded-xl italic leading-relaxed">
+                                          <strong>Excerpt Summary:</strong> {article.excerpt}
+                                        </p>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Article Content</h4>
+                                      <div className="max-h-[250px] overflow-y-auto pr-2 text-sm text-slate-300 leading-relaxed bg-[#06080e]/40 border border-white/5 p-4 rounded-xl whitespace-pre-wrap">
+                                        {article.content || "No text content provided."}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Editor Revision Composer and Actions */}
+                                  <div className="space-y-3.5 pt-4 border-t border-white/5">
+                                    <div className="space-y-1.5">
+                                      <label className="text-[10px] font-bold uppercase tracking-wider text-rose-400 pl-1">Rejection Feedback / Editorial Revision Instructions</label>
+                                      <textarea
+                                        className="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-xs text-white outline-none focus:border-rose-500/80 focus:ring-4 focus:ring-rose-500/10 placeholder-slate-600 transition duration-300"
+                                        rows="2"
+                                        placeholder="Explain why this news is rejected or what details the reporter needs to add/correct..."
+                                        value={feedbacks[`article-${article._id}`] || ""}
+                                        onChange={(event) => setFeedbacks({ ...feedbacks, [`article-${article._id}`]: event.target.value })}
+                                      />
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setExpandedArticleId(null)}
+                                        className="rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-400 hover:text-white hover:bg-white/5 transition"
+                                      >
+                                        Close panel
+                                      </button>
+                                      <div className="flex gap-2">
+                                        <button 
+                                          type="button" 
+                                          onClick={() => rejectArticle(article._id)}
+                                          className="rounded-xl bg-rose-600/10 border border-rose-500/20 text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition px-5 py-2.5 text-xs font-semibold"
+                                        >
+                                          Reject Submission
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => approveArticle(article._id)}
+                                          className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg transition px-5 py-2.5 text-xs font-bold flex items-center gap-1.5"
+                                        >
+                                          <Check size={14} /> Publish & Approve
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Empty Search Result State */}
+            {!pagedPendingArticles.length && (
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white/[0.01]">
+                <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/5 text-slate-400 mb-4 animate-pulse">
+                  <FileText className="h-6 w-6" />
                 </div>
+                <h3 className="text-sm font-semibold text-white">No articles pending approval</h3>
+                <p className="mt-1.5 text-xs text-slate-500 max-w-sm leading-5">
+                  Great job! All submitted stories have been processed and approved. No reports are waiting in the editorial review queue.
+                </p>
               </div>
-              <p className="mt-1 text-sm text-slate-500">By {joinMetaParts(article.author?.fullName, article.district, article.area)}</p>
-              <p className="mt-3 text-sm text-slate-400">{article.excerpt}</p>
-              {article.coverImageUrl ? (
-                <div className="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-slate-950/40">
-                  <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" />
+            )}
+          </div>
+
+          {/* Pagination Footer */}
+          {visiblePendingArticles.length > 0 && (
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5 pt-5">
+              <div className="text-xs text-slate-500">
+                Showing <span className="font-semibold text-white">{(pendingArticlePage - 1) * pendingArticlePageSize + 1}</span> to{" "}
+                <span className="font-semibold text-white">{Math.min(pendingArticlePage * pendingArticlePageSize, visiblePendingArticles.length)}</span> of{" "}
+                <span className="font-semibold text-white">{visiblePendingArticles.length}</span> entries
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* Page Size Selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">Rows per page:</span>
+                  <select
+                    className="rounded-xl border border-white/10 bg-slate-950 px-2 py-1 text-xs text-white focus:outline-none"
+                    value={pendingArticlePageSize}
+                    onChange={(e) => {
+                      setPendingArticlePageSize(Number(e.target.value));
+                      setPendingArticlePage(1);
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                  </select>
                 </div>
-              ) : null}
-              {article.audioUrl ? <AudioStoryPlayer article={article} compact className="mt-4" /> : null}
-              <textarea className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" rows="2" placeholder="Editorial feedback for rejection" value={feedbacks[`article-${article._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`article-${article._id}`]: event.target.value })} />
-              <div className="mt-4 flex gap-3">
-                <button type="button" onClick={() => approveArticle(article._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 transition">Publish</button>
-                <button type="button" onClick={() => rejectArticle(article._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">Reject</button>
+                
+                {/* Page switching buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={pendingArticlePage === 1}
+                    onClick={() => setPendingArticlePage((p) => Math.max(1, p - 1))}
+                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white disabled:opacity-40 hover:bg-white/5 transition"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-slate-400 px-2">
+                    Page {pendingArticlePage} of {totalPendingArticlePages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pendingArticlePage === totalPendingArticlePages}
+                    onClick={() => setPendingArticlePage((p) => Math.min(totalPendingArticlePages, p + 1))}
+                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white disabled:opacity-40 hover:bg-white/5 transition"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
-          ))}
-          {!visiblePendingArticles.length ? <p className="text-slate-500 py-4 text-center">No pending stories match your search.</p> : null}
+          )}
         </div>
       </div>
     );
@@ -6983,6 +7331,15 @@ export const DashboardPage = () => {
                   <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">{pendingUsers.length}</span>
                 )}
               </button>
+              <button onClick={() => { setActiveTab("queue"); setSidebarOpen(false); }} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "queue" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <div className="flex items-center gap-3">
+                  <Layers size={18} />
+                  Publishing Queue
+                </div>
+                {pendingArticles.length > 0 && (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">{pendingArticles.length}</span>
+                )}
+              </button>
               <button onClick={() => { setActiveTab("directory"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "directory" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
                 <Users size={18} />
                 Journalist Directory
@@ -7271,7 +7628,8 @@ export const DashboardPage = () => {
                   {notifications.map((notif) => (
                     <div
                       key={notif._id}
-                      className={`group relative rounded-2xl border p-5 transition-all duration-200 ${
+                      onClick={() => handleNotificationClick(notif)}
+                      className={`group relative rounded-2xl border p-5 transition-all duration-200 cursor-pointer ${
                         notif.isRead
                           ? "border-white/5 bg-white/[0.01] hover:bg-white/[0.02]"
                           : "border-orange-500/20 bg-orange-500/[0.01] hover:bg-orange-500/[0.02]"
@@ -7309,7 +7667,10 @@ export const DashboardPage = () => {
                           {!notif.isRead && (
                             <button
                               type="button"
-                              onClick={() => handleMarkRead(notif._id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkRead(notif._id);
+                              }}
                               className="rounded-full bg-orange-500/10 border border-orange-500/20 p-2 text-orange-400 hover:bg-orange-600 hover:text-white transition"
                               title="Mark as read"
                             >
@@ -7318,7 +7679,10 @@ export const DashboardPage = () => {
                           )}
                           <button
                             type="button"
-                            onClick={() => handleClearNotification(notif._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleClearNotification(notif._id);
+                            }}
                             className="rounded-full bg-white/5 p-2 text-slate-400 hover:bg-rose-600/15 hover:text-rose-400 transition"
                             title="Dismiss notification"
                           >
@@ -7374,7 +7738,7 @@ export const DashboardPage = () => {
               {!dashboardLoading && activeTab === "archive_logs" && user?.role !== "reporter" && renderArchiveLogs()}
               {!dashboardLoading && activeTab === "approvals" && user?.role === "super_admin" && renderApprovals()}
               {!dashboardLoading && activeTab === "directory" && user?.role === "super_admin" && renderDirectory()}
-              {!dashboardLoading && activeTab === "queue" && user?.role === "chief_editor" && renderQueue()}
+              {!dashboardLoading && activeTab === "queue" && (user?.role === "chief_editor" || user?.role === "super_admin") && renderQueue()}
               {!dashboardLoading && activeTab === "ad_desk" && user?.role === "super_admin" && renderAdDesk()}
               {!dashboardLoading && activeTab === "expiry_control" && user?.role === "super_admin" && renderExpiryControl()}
               {!dashboardLoading && activeTab === "notifications_control" && user?.role === "super_admin" && renderNotificationsControl()}
