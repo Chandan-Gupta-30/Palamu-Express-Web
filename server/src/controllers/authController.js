@@ -317,6 +317,19 @@ export const sendEmailOtp = asyncHandler(async (req, res) => {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: "Please provide a valid email address." });
   }
 
+  // Prevent duplicate registration: check if email is already registered
+  const existingEmailUser = await User.findOne({
+    $or: [
+      { email: email },
+      { email: String(req.body.email || "").trim() }
+    ]
+  });
+  if (existingEmailUser) {
+    return res.status(StatusCodes.CONFLICT).json({
+      message: "This email address is already registered. Please sign in or use another email.",
+    });
+  }
+
   const otp = createOtpCode();
   await saveEmailOtp(email, otp);
 
