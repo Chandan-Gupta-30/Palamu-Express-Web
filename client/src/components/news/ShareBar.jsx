@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Copy, Facebook, Share2 } from "lucide-react";
 import { WhatsAppIcon } from "./WhatsAppIcon";
+import { http } from "../../api/http";
 
-export const ShareBar = ({ url, title, whatsappUrl, onCopy }) => {
+export const ShareBar = ({ slug, url, title, whatsappUrl, onCopy }) => {
   const [copyMessage, setCopyMessage] = useState("");
   const shareLinks = {
     whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title} ${whatsappUrl || url}`)}`,
@@ -10,11 +11,20 @@ export const ShareBar = ({ url, title, whatsappUrl, onCopy }) => {
     x: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`,
   };
 
+  const recordShare = () => {
+    if (slug) {
+      http.post(`/articles/${slug}/share`).catch((err) => {
+        console.warn("[Analytics] Share tracking failed:", err.message);
+      });
+    }
+  };
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(url);
       setCopyMessage("Article link copied successfully.");
       onCopy?.({ type: "success", message: "Article link copied successfully." });
+      recordShare();
     } catch (_) {
       setCopyMessage("Unable to copy the article link right now.");
       onCopy?.({ type: "error", message: "Unable to copy the article link right now." });
@@ -26,15 +36,15 @@ export const ShareBar = ({ url, title, whatsappUrl, onCopy }) => {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-3">
-      <a href={shareLinks.whatsapp} target="_blank" rel="noreferrer" className="whatsapp-share-button rounded-full border border-white/10 px-4 py-2 text-sm">
+      <a href={shareLinks.whatsapp} onClick={recordShare} target="_blank" rel="noreferrer" className="whatsapp-share-button rounded-full border border-white/10 px-4 py-2 text-sm">
         <WhatsAppIcon className="mr-2 inline h-4 w-4" />
         WhatsApp
       </a>
-      <a href={shareLinks.facebook} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 px-4 py-2 text-sm">
+      <a href={shareLinks.facebook} onClick={recordShare} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 px-4 py-2 text-sm">
         <Facebook className="mr-2 inline" size={16} />
         Facebook
       </a>
-      <a href={shareLinks.x} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 px-4 py-2 text-sm">
+      <a href={shareLinks.x} onClick={recordShare} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 px-4 py-2 text-sm">
         <Share2 className="mr-2 inline" size={16} />
         X
       </a>

@@ -11,6 +11,7 @@ import {
   getWorkflowArticles,
   generateVoiceArticleDraft,
   incrementArticleView,
+  incrementArticleShare,
   rejectArticle,
   summarizeArticleById,
   updateArticle,
@@ -28,6 +29,7 @@ router.delete("/published/archive", protect, authorize(roles.SUPER_ADMIN, roles.
 router.get("/", getArticles);
 router.get("/:slug", getArticleBySlug);
 router.post("/:slug/view", incrementArticleView);
+router.post("/:slug/share", incrementArticleShare);
 router.post("/", protect, authorize(roles.REPORTER, roles.CHIEF_EDITOR, roles.SUPER_ADMIN), createArticle);
 router.patch("/:id", protect, authorize(roles.REPORTER, roles.CHIEF_EDITOR, roles.SUPER_ADMIN), updateArticle);
 router.delete("/:id", protect, authorize(roles.REPORTER, roles.CHIEF_EDITOR, roles.SUPER_ADMIN), deleteArticle);

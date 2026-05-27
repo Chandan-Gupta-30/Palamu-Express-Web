@@ -12,6 +12,7 @@ import adRoutes from "./routes/adRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 import { env } from "./config/env.js";
 import { errorHandler, notFound } from "./middlewares/errorHandler.js";
 import { getArticleSharePreview } from "./controllers/articleController.js";
@@ -64,7 +65,7 @@ export const createApp = (io) => {
   );
 
   app.use((req, res, next) => {
-    req.io = io;
+    req.io = io && io.current !== undefined ? io.current : io;
     next();
   });
 
@@ -81,6 +82,7 @@ export const createApp = (io) => {
   app.use("/api/analytics", analyticsRoutes);
   app.use("/api/categories", categoryRoutes);
   app.use("/api/contact", contactRoutes);
+  app.use("/api/notifications", notificationRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

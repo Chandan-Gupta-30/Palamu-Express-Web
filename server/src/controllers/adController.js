@@ -69,6 +69,11 @@ const normalizeAdvertisementRecord = (ad) => {
     companyName: record.companyName || "",
     notes: record.notes || "",
     rejectionReason: record.rejectionReason || "",
+    articleId: record.articleId || "",
+    adPosition: record.adPosition || "middle",
+    paragraphIndex: record.paragraphIndex !== undefined ? Number(record.paragraphIndex) : 2,
+    viewsCount: Number(record.viewsCount || 0),
+    clicksCount: Number(record.clicksCount || 0),
   };
 };
 
@@ -89,6 +94,9 @@ const normalizeAdminAdvertisementInput = async (payload = {}, user) => {
   const advertiserPhone = String(payload.advertiserPhone || user?.phone || "").trim();
   const companyName = String(payload.companyName || "").trim();
   const notes = String(payload.notes || "").trim();
+  const articleId = String(payload.articleId || "").trim();
+  const adPosition = String(payload.adPosition || "middle").trim();
+  const paragraphIndex = payload.paragraphIndex !== undefined ? Number(payload.paragraphIndex) : 2;
 
   if (!title) throw buildHttpError("Advertisement title is required.");
   if (!imageUrl) throw buildHttpError("Please provide a banner image URL or upload an image.");
@@ -117,6 +125,9 @@ const normalizeAdminAdvertisementInput = async (payload = {}, user) => {
     advertiserPhone,
     companyName,
     notes,
+    articleId,
+    adPosition,
+    paragraphIndex,
   };
 };
 
@@ -147,6 +158,9 @@ const normalizeAdminAdvertisementUpdateInput = async (payload = {}, user, existi
     companyName: String(payload.companyName ?? existingAd?.companyName ?? "").trim(),
     notes: String(payload.notes ?? existingAd?.notes ?? "").trim(),
     status: payload.status ?? existingAd?.status,
+    articleId: payload.articleId !== undefined ? String(payload.articleId).trim() : (existingAd?.articleId || ""),
+    adPosition: payload.adPosition !== undefined ? String(payload.adPosition).trim() : (existingAd?.adPosition || "middle"),
+    paragraphIndex: payload.paragraphIndex !== undefined ? Number(payload.paragraphIndex) : (existingAd?.paragraphIndex ?? 2),
   };
 
   return normalizeAdminAdvertisementInput(resolvedPayload, user);
@@ -417,4 +431,54 @@ export const deleteAdvertisement = asyncHandler(async (req, res) => {
   }
 
   res.json({ message: "Advertisement deleted." });
+});
+
+export const getActiveInArticleAds = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const ads = await Advertisement.find({
+    status: adStatuses.ACTIVE,
+    placement: "in-article",
+    $or: [
+      { articleId: req.params.articleId },
+      { articleId: "all" },
+      { articleId: "" }
+    ],
+    $or: [{ endsAt: { $gte: now } }, { endsAt: { $exists: false } }, { endsAt: null }],
+  }).sort({ priority: 1, createdAt: -1 });
+
+  res.json({ ads: ads.map((ad) => normalizeAdvertisementRecord(ad)) });
+});
+
+export const incrementAdImpression = asyncHandler(async (req, res) => {
+  const ad = await Advertisement.findById(req.params.id);
+  if (!ad) {
+    throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
+  }
+  ad.viewsCount = (ad.viewsCount || 0) + 1;
+  await ad.save();
+
+  req.io?.emit("ad:live-update", {
+    adId: String(ad._id),
+    viewsCount: ad.viewsCount,
+    clicksCount: ad.clicksCount || 0,
+  });
+
+  res.json({ message: "Impression registered.", viewsCount: ad.viewsCount });
+});
+
+export const incrementAdClick = asyncHandler(async (req, res) => {
+  const ad = await Advertisement.findById(req.params.id);
+  if (!ad) {
+    throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
+  }
+  ad.clicksCount = (ad.clicksCount || 0) + 1;
+  await ad.save();
+
+  req.io?.emit("ad:live-update", {
+    adId: String(ad._id),
+    viewsCount: ad.viewsCount || 0,
+    clicksCount: ad.clicksCount,
+  });
+
+  res.json({ message: "Click registered.", clicksCount: ad.clicksCount });
 });

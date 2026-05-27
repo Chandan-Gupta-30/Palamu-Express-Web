@@ -336,3 +336,40 @@ aside nav button.bg-orange-500\/10 {
 html.light aside nav button.bg-orange-500\/10 {
   border-color: rgba(249, 115, 22, 0.3) !important;
 }
+
+/* Premium Live Counter Pop-and-Glow Animation for Active Readers Now card */
+@keyframes counter-pop {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(249, 115, 22, 0));
+  }
+  50% {
+    transform: scale(1.18);
+    filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.5));
+    color: #f97316; /* Temporarily highlight with vibrant orange */
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(249, 115, 22, 0));
+  }
+}
+
+.animate-counter-pop {
+  animation: counter-pop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  display: inline-block;
+}
+
+/* Premium Slide-Over Resolution Drawer Animation */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

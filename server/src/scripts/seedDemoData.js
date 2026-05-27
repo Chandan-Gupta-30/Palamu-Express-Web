@@ -101,6 +101,7 @@ const seed = async () => {
       author: approvedReporter?._id,
       reviewedBy: admin._id,
       publishedAt: new Date(),
+      category: "education",
     },
     {
       title: "Farm road repair demand rises in Hussainabad villages",
@@ -115,6 +116,7 @@ const seed = async () => {
       pageViews: 12,
       trendingScore: 1,
       author: approvedReporter?._id,
+      category: "agriculture",
     },
     {
       title: "Ranchi commuters welcome revised bus route proposal",
@@ -129,6 +131,7 @@ const seed = async () => {
       pageViews: 9,
       trendingScore: 0,
       author: pendingReporter?._id,
+      category: "business",
     },
     {
       title: "Evening health camp draws strong turnout in Chainpur",
@@ -145,6 +148,7 @@ const seed = async () => {
       author: approvedReporter?._id,
       reviewedBy: admin._id,
       publishedAt: new Date(),
+      category: "health",
     },
   ];
 

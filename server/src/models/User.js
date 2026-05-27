@@ -8,6 +8,7 @@ class UserDocument extends FirestoreDocument {
     if (this.role === undefined) this.role = roles.ADVERTISER;
     if (this.approvalStatus === undefined) this.approvalStatus = approvalStatuses.PENDING;
     if (this.isPhoneVerified === undefined) this.isPhoneVerified = false;
+    if (this.isEmailVerified === undefined) this.isEmailVerified = false;
     if (this.isFunctionalityDisabled === undefined) this.isFunctionalityDisabled = false;
     if (this.bookmarks === undefined) this.bookmarks = [];
     if (this.bloodGroup === undefined) this.bloodGroup = "O+";
@@ -24,6 +25,7 @@ class UserDocument extends FirestoreDocument {
     if (rawData.role === undefined) rawData.role = roles.ADVERTISER;
     if (rawData.approvalStatus === undefined) rawData.approvalStatus = approvalStatuses.PENDING;
     if (rawData.isPhoneVerified === undefined) rawData.isPhoneVerified = false;
+    if (rawData.isEmailVerified === undefined) rawData.isEmailVerified = false;
     if (rawData.isFunctionalityDisabled === undefined) rawData.isFunctionalityDisabled = false;
     if (rawData.bookmarks === undefined) rawData.bookmarks = [];
     if (rawData.bloodGroup === undefined) rawData.bloodGroup = "O+";

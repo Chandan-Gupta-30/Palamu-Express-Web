@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, Fragment } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Bookmark, User, Calendar, Eye, Play, Pause, Volume2, Square, SkipForward, SkipBack } from "lucide-react";
+import { ArrowLeft, Bookmark, User, Calendar, Eye, Play, Pause, Volume2, Square, SkipForward, SkipBack, Clock } from "lucide-react";
 import { http } from "../api/http";
+import { newsCategoryLabels } from "../data/districts";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { ShareBar } from "../components/news/ShareBar";
 import { ActionPopup } from "../components/ui/ActionPopup";
@@ -80,6 +81,14 @@ export const ArticlePage = () => {
   const [summaryReplayToken, setSummaryReplayToken] = useState(0);
   const [actionPopup, setActionPopup] = useState(null);
   const { pageViews } = useSocket(slug);
+  const [inArticleAds, setInArticleAds] = useState([]);
+  const reportedAdsRef = useRef(new Set());
+  
+  const readTime = useMemo(() => {
+    if (!article || !article.content) return 1;
+    const words = article.content.split(/\s+/).filter(Boolean).length;
+    return Math.max(1, Math.ceil(words / 200));
+  }, [article]);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -337,13 +346,83 @@ export const ArticlePage = () => {
   };
 
   useEffect(() => {
+    reportedAdsRef.current.clear();
     http.get(`/articles/${slug}`).then(({ data }) => {
       setArticle(data.article);
       setSummary(data.article.aiSummary || "");
       setDisplayedSummary("");
       setSummaryError("");
+
+      // Fetch active in-article advertisements targeting this article ID
+      http.get(`/ads/in-article/${data.article._id}`)
+        .then(({ data: adData }) => {
+          const activeAds = adData.ads || [];
+          setInArticleAds(activeAds);
+
+          // Report background impressions/views counts to server
+          activeAds.forEach((ad) => {
+            if (!reportedAdsRef.current.has(ad._id)) {
+              reportedAdsRef.current.add(ad._id);
+              http.post(`/ads/${ad._id}/impression`).catch(() => {});
+            }
+          });
+        })
+        .catch((err) => {
+          console.error("Failed to fetch targeted in-article ads:", err);
+        });
     });
   }, [slug]);
+
+  const renderSponsorAd = (ad) => {
+    if (!ad) return null;
+    return (
+      <div key={ad._id} className="my-6 p-5 rounded-3xl border border-white/10 bg-gradient-to-r from-orange-500/10 via-slate-900/40 to-slate-900/60 backdrop-blur-md overflow-hidden animate-[fadeIn_0.5s_ease-out] shadow-xl">
+        <div className="flex flex-col md:flex-row gap-5 items-center justify-between">
+          <div className="flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full bg-orange-500/10 px-3 py-1 text-[10px] font-bold text-orange-400 border border-orange-500/20 uppercase tracking-widest">Sponsored Injection</span>
+              {ad.companyName && <span className="text-xs font-semibold text-slate-400">{ad.companyName}</span>}
+            </div>
+            <h4 className="text-lg font-bold text-white tracking-wide">{ad.title}</h4>
+            {ad.description && <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">{ad.description}</p>}
+            
+            {ad.targetUrl && (
+              <a
+                href={ad.targetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  http.post(`/ads/${ad._id}/click`).catch(() => {});
+                }}
+                className="inline-flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors uppercase tracking-wider mt-1 group"
+              >
+                {ad.ctaLabel || "Visit Sponsor"}
+                <ArrowLeft size={12} className="rotate-180 transition-transform group-hover:translate-x-1" />
+              </a>
+            )}
+          </div>
+          
+          {ad.imageUrl && (
+            <div className="w-full md:w-48 h-28 flex-shrink-0 rounded-2xl overflow-hidden border border-white/10 shadow-inner group relative">
+              <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+              {ad.targetUrl && (
+                <a
+                  href={ad.targetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    http.post(`/ads/${ad._id}/click`).catch(() => {});
+                  }}
+                  className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  aria-label={ad.title}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (!summary) {
@@ -501,9 +580,16 @@ export const ArticlePage = () => {
         </button>
       ) : null}
       <div className="space-y-3">
-        <p className="text-sm uppercase tracking-[0.3em] text-orange-300">
-          {[article.district, article.area, article.panchayat].filter(Boolean).join(" • ")}
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm uppercase tracking-[0.3em] text-orange-300">
+            {[article.district, article.area, article.panchayat].filter(Boolean).join(" • ")}
+          </p>
+          {article.category && (
+            <span className="rounded-full bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-orange-300 border border-orange-500/20">
+              {newsCategoryLabels[article.category] || article.category}
+            </span>
+          )}
+        </div>
         <h1 className="font-display text-4xl text-white md:text-5xl">{article.title}</h1>
         <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs font-semibold text-slate-400">
           <span className="inline-flex items-center gap-1.5 bg-white/5 px-2.5 py-1 rounded-md border border-white/5 text-slate-300">
@@ -519,6 +605,11 @@ export const ArticlePage = () => {
           <span className="inline-flex items-center gap-1.5 text-slate-400">
             <Eye size={13} className="text-slate-500" />
             {pageViews || article.pageViews} Views
+          </span>
+          <span className="h-4 w-[1px] bg-slate-800 hidden sm:inline" />
+          <span className="inline-flex items-center gap-1.5 text-slate-400">
+            <Clock size={13} className="text-slate-500" />
+            {readTime} Min Read
           </span>
         </div>
       </div>
@@ -603,50 +694,74 @@ export const ArticlePage = () => {
           ) : null}
         </div>
         <div className="mt-6 space-y-5">
+          {/* Top In-Article Ads Injection */}
+          {inArticleAds.filter((ad) => ad.adPosition === "top").map((ad) => renderSponsorAd(ad))}
+
           {parsedStructure.paragraphs.map((pObj, pIndex) => {
             const isParagraphActive = pObj.sentences.some((s) => isPlaying && currentSentenceIndex === s.id);
+            
+            // Check for matching middle or index-specific ads running after this paragraph index
+            const matchingAds = inArticleAds.filter((ad) => {
+              if (ad.adPosition === "between-paragraphs") {
+                return Number(ad.paragraphIndex) === pIndex + 1;
+              }
+              if (ad.adPosition === "middle") {
+                const midParagraphIndex = Math.floor(parsedStructure.paragraphs.length / 2);
+                return pIndex === midParagraphIndex;
+              }
+              return false;
+            });
+
             return (
-              <div
-                key={pIndex}
-                className={`relative rounded-2xl p-4 leading-8 border transition-colors duration-150 ${
-                  isPlaying
-                    ? isParagraphActive
-                      ? "bg-orange-500/[0.04] border-orange-500/20 shadow-sm opacity-100"
-                      : "border-transparent opacity-40"
-                    : "border-transparent text-slate-300 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                {pObj.sentences.map((sObj) => {
-                  const isSentenceActive = isPlaying && currentSentenceIndex === sObj.id;
-                  return (
-                    <span
-                      key={sObj.id}
-                      id={`article-sentence-${sObj.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        playSpeech(sObj.id);
-                      }}
-                      className={`inline cursor-pointer rounded px-1 py-0.5 border transition-colors duration-150 ${
-                        isSentenceActive
-                          ? "bg-orange-500/10 text-orange-100 font-medium border-orange-500/20"
-                          : "border-transparent text-slate-300 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {isSentenceActive ? (
-                        <ActiveSentenceRenderer
-                          text={sObj.text}
-                          currentWordCharIndex={currentWordCharIndex}
-                        />
-                      ) : (
-                        sObj.text
-                      )}
-                      {" "}
-                    </span>
-                  );
-                })}
-              </div>
+              <Fragment key={pIndex}>
+                <div
+                  className={`relative rounded-2xl p-4 leading-8 border transition-colors duration-150 ${
+                    isPlaying
+                      ? isParagraphActive
+                        ? "bg-orange-500/[0.04] border-orange-500/20 shadow-sm opacity-100"
+                        : "border-transparent opacity-40"
+                      : "border-transparent text-slate-300 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  {pObj.sentences.map((sObj) => {
+                    const isSentenceActive = isPlaying && currentSentenceIndex === sObj.id;
+                    return (
+                      <span
+                        key={sObj.id}
+                        id={`article-sentence-${sObj.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playSpeech(sObj.id);
+                        }}
+                        className={`inline cursor-pointer rounded px-1 py-0.5 border transition-colors duration-150 ${
+                          isSentenceActive
+                            ? "bg-orange-500/10 text-orange-100 font-medium border-orange-500/20"
+                            : "border-transparent text-slate-300 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {isSentenceActive ? (
+                          <ActiveSentenceRenderer
+                            text={sObj.text}
+                            currentWordCharIndex={currentWordCharIndex}
+                          />
+                        ) : (
+                          sObj.text
+                        )}
+                        {" "}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {/* Render any matching in-article ads right below the paragraph block */}
+                {matchingAds.map((ad) => renderSponsorAd(ad))}
+              </Fragment>
             );
           })}
+
+          {/* Bottom In-Article Ads Injection */}
+          {inArticleAds.filter((ad) => ad.adPosition === "bottom").map((ad) => renderSponsorAd(ad))}
+
           {parsedStructure.sentences.length === 0 && (
             <p className="text-slate-500 italic">This voice bulletin does not include written story notes yet.</p>
           )}
@@ -735,6 +850,7 @@ export const ArticlePage = () => {
       ) : null}
 
       <ShareBar
+        slug={slug}
         url={articleUrl}
         title={article.title}
         whatsappUrl={whatsappPreviewUrl}

@@ -51,3 +51,34 @@ export const jharkhandBlocksByDistrict = {
   Simdega: ["Simdega", "Kolebira", "Jaldega", "Bano", "Thethaitangar", "Bolba", "Kurdeg", "Kersai", "Pakartanr", "Bansjore"],
   "West Singhbhum": ["Tonto", "Hat Gamharia", "Kumardungi", "Jagannathpur", "Manjhari", "Chakradharpur", "Khuntpani", "Tantnagar", "Jhinkpani", "Bandgaon", "Goilkera", "Anandpur", "Manoharpur", "Noamundi", "Gudri", "Sonua", "Majhgaon", "Chaibasa"],
 };
+
+export const newsCategories = [
+  "official_coverage",
+  "crime",
+  "politics",
+  "agriculture",
+  "education",
+  "public_grievances",
+  "promotional",
+  "health",
+  "sports",
+  "business",
+  "technology",
+  "other",
+];
+
+export const newsCategoryLabels = {
+  official_coverage: "Administration & Governance",
+  crime: "Crime",
+  politics: "Politics",
+  agriculture: "Agriculture",
+  education: "Education",
+  public_grievances: "Public Grievances",
+  promotional: "Promotions & Launches",
+  health: "Health",
+  sports: "Sports",
+  business: "Business",
+  technology: "Technology",
+  other: "Other",
+};
+

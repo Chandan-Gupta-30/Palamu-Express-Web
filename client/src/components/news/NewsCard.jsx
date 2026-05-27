@@ -2,45 +2,66 @@ import { Link } from "react-router-dom";
 import { AudioStoryPlayer } from "../audio/AudioStoryPlayer";
 import { WhatsAppIcon } from "./WhatsAppIcon";
 import { getArticleAuthorName, getArticlePublishedLabel, getWhatsAppShareLink } from "../../utils/articles";
+import { newsCategoryLabels } from "../../data/districts";
 
-export const NewsCard = ({ article }) => (
-  <article className="panel overflow-hidden">
-    {article.coverImageUrl ? (
-      <div className="flex h-44 items-center justify-center overflow-hidden bg-slate-950/40">
-        <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain" loading="lazy" />
-      </div>
-    ) : (
-      <div className="h-44 bg-gradient-to-br from-orange-500/30 via-slate-800 to-slate-900" />
-    )}
-    <div className="space-y-3 p-5">
-      <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400">
-        <span>{article.district}</span>
-        <span>{article.audioUrl ? "Voice Live" : article.area}</span>
-      </div>
-      <div className="flex items-start justify-between gap-3 text-sm text-slate-400">
-        <div>
-          <p>By {getArticleAuthorName(article)}</p>
-          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{getArticlePublishedLabel(article)}</p>
+export const NewsCard = ({ article }) => {
+  const words = article.content ? article.content.split(/\s+/).filter(Boolean).length : 0;
+  const readTime = Math.max(1, Math.ceil(words / 200));
+
+  return (
+    <article className="panel overflow-hidden relative group hover:shadow-lg hover:border-orange-500/20 transition-all duration-300">
+      <Link to={`/article/${article.slug}`} className="absolute inset-0 z-10" aria-label={article.title} />
+      
+      {article.coverImageUrl ? (
+        <div className="flex h-44 items-center justify-center overflow-hidden bg-slate-950/40">
+          <img src={article.coverImageUrl} alt={article.title} className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
         </div>
-        <a
-          href={getWhatsAppShareLink({ slug: article.slug, title: article.title })}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`Share ${article.title} on WhatsApp`}
-          className="whatsapp-share-button inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20 hover:text-emerald-200"
-        >
-          <WhatsAppIcon className="h-4 w-4" />
-        </a>
+      ) : (
+        <div className="h-44 bg-gradient-to-br from-orange-500/30 via-slate-800 to-slate-900" />
+      )}
+      <div className="space-y-3 p-5">
+        <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400">
+          <span className="flex items-center gap-2">
+            {article.district}
+            {article.category && (
+              <span className="rounded bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-orange-300 border border-orange-500/10 normal-case tracking-normal">
+                {newsCategoryLabels[article.category] || article.category}
+              </span>
+            )}
+          </span>
+          <span>{article.audioUrl ? "Voice Live" : article.area}</span>
+        </div>
+        <div className="flex items-start justify-between gap-3 text-sm text-slate-400">
+          <div>
+            <p>By {getArticleAuthorName(article)}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
+              {getArticlePublishedLabel(article)} • {readTime} min read
+            </p>
+          </div>
+          <a
+            href={getWhatsAppShareLink({ slug: article.slug, title: article.title })}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Share ${article.title} on WhatsApp`}
+            className="whatsapp-share-button relative z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500/10 text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-500/20 hover:text-emerald-200"
+          >
+            <WhatsAppIcon className="h-4 w-4" />
+          </a>
+        </div>
+        <h3 className="text-xl font-semibold text-white">{article.title}</h3>
+        <p className="text-sm leading-6 text-slate-300">{article.excerpt}</p>
+        {article.audioUrl ? (
+          <div className="relative z-20">
+            <AudioStoryPlayer article={article} compact />
+          </div>
+        ) : null}
+        <Link to={`/article/${article.slug}`} className="relative z-20 inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100 transition">
+          {article.audioUrl ? "Open Story & Audio" : "Read Story"}
+        </Link>
       </div>
-      <h3 className="text-xl font-semibold text-white">{article.title}</h3>
-      <p className="text-sm leading-6 text-slate-300">{article.excerpt}</p>
-      {article.audioUrl ? <AudioStoryPlayer article={article} compact /> : null}
-      <Link to={`/article/${article.slug}`} className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900">
-        {article.audioUrl ? "Open Story & Audio" : "Read Story"}
-      </Link>
-    </div>
-  </article>
-);
+    </article>
+  );
+};
 
 export const NewsCardSkeleton = () => (
   <div className="panel overflow-hidden animate-pulse">

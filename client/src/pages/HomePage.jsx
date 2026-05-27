@@ -6,6 +6,7 @@ import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { NewsCard, NewsCardSkeleton } from "../components/news/NewsCard";
 import { WhatsAppIcon } from "../components/news/WhatsAppIcon";
 import { getArticleAuthorName, getArticlePublishedLabel, getWhatsAppShareLink } from "../utils/articles";
+import { newsCategories, newsCategoryLabels } from "../data/districts";
 
 const initialFeed = {
   breaking: [],
@@ -115,6 +116,7 @@ export const HomePage = () => {
   const [selectedDate, setSelectedDate] = useState("");
   const [latestPage, setLatestPage] = useState(1);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [tickerCycle, setTickerCycle] = useState(0);
   const featured = useMemo(() => {
@@ -123,7 +125,7 @@ export const HomePage = () => {
   }, [feed.breaking, feed.latest]);
 
   useEffect(() => {
-    const cacheKey = `${selectedDate || "all"}-${latestPage}`;
+    const cacheKey = `${selectedDate || "all"}-${selectedCategory || "all"}-${latestPage}`;
     const now = Date.now();
     const cached = clientFeedCache[cacheKey];
     const hasCache = Boolean(cached);
@@ -149,7 +151,7 @@ export const HomePage = () => {
     }
 
     http
-      .get("/articles/homepage/feed", { params: { date: selectedDate, page: latestPage } })
+      .get("/articles/homepage/feed", { params: { date: selectedDate, category: selectedCategory, page: latestPage } })
       .then(({ data }) => {
         const feedData = { ...initialFeed, ...data };
         clientFeedCache[cacheKey] = feedData;
@@ -162,7 +164,7 @@ export const HomePage = () => {
         }
       })
       .finally(() => setFeedLoading(false));
-  }, [latestPage, selectedDate]);
+  }, [latestPage, selectedDate, selectedCategory]);
 
   useEffect(() => {
     const now = Date.now();
@@ -183,7 +185,7 @@ export const HomePage = () => {
 
   useEffect(() => {
     setLatestPage(1);
-  }, [selectedDate]);
+  }, [selectedDate, selectedCategory]);
 
   useEffect(() => {
     if (!feed.breaking.length) return undefined;
@@ -487,8 +489,8 @@ export const HomePage = () => {
         </section>
       ) : null}
 
-      <section>
-        <div className="mb-5 flex items-center justify-between gap-4">
+      <section className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="section-title">Latest Updates</h2>
             {feed.isDateFiltered && feed.effectiveDate ? (
@@ -501,9 +503,38 @@ export const HomePage = () => {
               </p>
             )}
           </div>
-          <div className="rounded-full border border-dashed border-orange-300/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-orange-200">
-            Sponsor placements ordered by priority
+          <div className="rounded-full border border-dashed border-orange-300/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-orange-200 self-start md:self-auto">
+            Thematic & district filters active
           </div>
+        </div>
+
+        {/* Premium Category Filter Tabs */}
+        <div className="flex overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 gap-2 border-b border-white/5">
+          <button
+            type="button"
+            onClick={() => setSelectedCategory("")}
+            className={`rounded-full px-5 py-2 text-sm font-semibold tracking-wide transition-all duration-300 shrink-0 ${
+              selectedCategory === ""
+                ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/20"
+                : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white border border-white/5"
+            }`}
+          >
+            All News
+          </button>
+          {newsCategories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setSelectedCategory(category)}
+              className={`rounded-full px-5 py-2 text-sm font-semibold tracking-wide transition-all duration-300 shrink-0 ${
+                selectedCategory === category
+                  ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/20"
+                  : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white border border-white/5"
+              }`}
+            >
+              {newsCategoryLabels[category]}
+            </button>
+          ))}
         </div>
 
         {latestAds.length ? (

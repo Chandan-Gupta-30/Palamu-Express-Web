@@ -338,13 +338,15 @@ export const VerificationPage = () => {
               <span className="text-[10px] text-slate-500 font-mono">Token ID: {user._id}</span>
               
               <div className="flex gap-4">
-                <Link
-                  to="/"
+                <a
+                  href="/"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="bg-white/5 hover:bg-white/10 text-white font-bold text-xs px-4 py-2 rounded-xl transition border border-white/10 flex items-center gap-1.5"
                 >
                   Visit Portal
                   <ExternalLink className="h-3 w-3" />
-                </Link>
+                </a>
                 
                 {user.idCardUrl && (
                   <a

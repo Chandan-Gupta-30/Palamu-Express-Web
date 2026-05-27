@@ -1,5 +1,5 @@
 import { FirestoreModel, FirestoreDocument } from "./FirestoreModel.js";
-import { articleStatuses } from "../utils/constants.js";
+import { articleStatuses, articleCategories } from "../utils/constants.js";
 
 class ArticleDocument extends FirestoreDocument {
   constructor(modelClass, data) {
@@ -14,6 +14,8 @@ class ArticleDocument extends FirestoreDocument {
     if (this.breaking === undefined) this.breaking = false;
     if (this.trendingScore === undefined) this.trendingScore = 0;
     if (this.pageViews === undefined) this.pageViews = 0;
+    if (this.shareCount === undefined) this.shareCount = 0;
+    if (this.category === undefined) this.category = "other";
   }
 
   async preSave(rawData) {
@@ -42,6 +44,13 @@ class ArticleDocument extends FirestoreDocument {
     if (rawData.breaking === undefined) rawData.breaking = false;
     if (rawData.trendingScore === undefined) rawData.trendingScore = 0;
     if (rawData.pageViews === undefined) rawData.pageViews = 0;
+    if (rawData.shareCount === undefined) rawData.shareCount = 0;
+
+    // Validate and set category
+    if (rawData.category === undefined || !Object.values(articleCategories).includes(rawData.category)) {
+      rawData.category = "other";
+    }
+    this.category = rawData.category;
   }
 }
 

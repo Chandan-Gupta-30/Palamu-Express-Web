@@ -14,6 +14,11 @@ class AdvertisementDocument extends FirestoreDocument {
     if (this.notes === undefined) this.notes = "";
     if (this.paymentStatus === undefined) this.paymentStatus = "pending";
     if (this.rejectionReason === undefined) this.rejectionReason = "";
+    if (this.articleId === undefined) this.articleId = "";
+    if (this.adPosition === undefined) this.adPosition = "middle";
+    if (this.paragraphIndex === undefined) this.paragraphIndex = 2;
+    if (this.viewsCount === undefined) this.viewsCount = 0;
+    if (this.clicksCount === undefined) this.clicksCount = 0;
   }
 
   async preSave(rawData) {
@@ -27,6 +32,11 @@ class AdvertisementDocument extends FirestoreDocument {
     if (rawData.notes === undefined) rawData.notes = "";
     if (rawData.paymentStatus === undefined) rawData.paymentStatus = "pending";
     if (rawData.rejectionReason === undefined) rawData.rejectionReason = "";
+    if (rawData.articleId === undefined) rawData.articleId = "";
+    if (rawData.adPosition === undefined) rawData.adPosition = "middle";
+    if (rawData.paragraphIndex === undefined) rawData.paragraphIndex = 2;
+    if (rawData.viewsCount === undefined) rawData.viewsCount = 0;
+    if (rawData.clicksCount === undefined) rawData.clicksCount = 0;
   }
 }
 

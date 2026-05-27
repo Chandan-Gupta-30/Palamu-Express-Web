@@ -36,7 +36,7 @@ export const ActionPopup = ({
   const Icon = tone.icon;
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/72 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/72 px-4 backdrop-blur-sm">
       <div className={`w-full max-w-md rounded-[30px] border p-6 shadow-[0_32px_90px_rgba(15,23,42,0.45)] ${tone.panelClassName}`}>
         <div className="flex items-start justify-between gap-4">
           <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] ${tone.badgeClassName}`}>

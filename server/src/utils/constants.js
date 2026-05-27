@@ -31,6 +31,7 @@ export const adPlacements = {
   HOMEPAGE_HERO: "homepage-hero",
   HOMEPAGE_LATEST: "homepage-latest",
   HOMEPAGE_DISTRICT: "homepage-district",
+  IN_ARTICLE: "in-article",
 };
 
 export const adDurationOptions = [1, 3, 7, 15, 30];
@@ -50,6 +51,11 @@ export const adPlacementPricing = {
     baseDailyRate: 699,
     label: "Homepage Hero Rail",
     shortLabel: "Homepage Hero Rail",
+  },
+  [adPlacements.IN_ARTICLE]: {
+    baseDailyRate: 199,
+    label: "In-Article Sponsor Injection",
+    shortLabel: "In-Article Injection",
   },
 };
 
@@ -106,3 +112,34 @@ export const jharkhandBlocksByDistrict = {
   Simdega: ["Simdega", "Kolebira", "Jaldega", "Bano", "Thethaitangar", "Bolba", "Kurdeg", "Kersai", "Pakartanr", "Bansjore"],
   "West Singhbhum": ["Tonto", "Hat Gamharia", "Kumardungi", "Jagannathpur", "Manjhari", "Chakradharpur", "Khuntpani", "Tantnagar", "Jhinkpani", "Bandgaon", "Goilkera", "Anandpur", "Manoharpur", "Noamundi", "Gudri", "Sonua", "Majhgaon", "Chaibasa"]
 };
+
+export const articleCategories = {
+  OFFICIAL_COVERAGE: "official_coverage",
+  CRIME: "crime",
+  POLITICS: "politics",
+  AGRICULTURE: "agriculture",
+  EDUCATION: "education",
+  PUBLIC_GRIEVANCES: "public_grievances",
+  PROMOTIONAL: "promotional",
+  HEALTH: "health",
+  SPORTS: "sports",
+  BUSINESS: "business",
+  TECHNOLOGY: "technology",
+  OTHER: "other",
+};
+
+export const articleCategoryLabels = {
+  official_coverage: "Administration & Governance",
+  crime: "Crime",
+  politics: "Politics",
+  agriculture: "Agriculture",
+  education: "Education",
+  public_grievances: "Public Grievances",
+  promotional: "Promotions & Launches",
+  health: "Health",
+  sports: "Sports",
+  business: "Business",
+  technology: "Technology",
+  other: "Other",
+};
+

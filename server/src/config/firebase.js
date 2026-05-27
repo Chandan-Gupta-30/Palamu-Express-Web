@@ -97,6 +97,56 @@ const invalidateCache = (colName) => {
   }
 };
 
+const shouldInvalidate = (colName, docId, data) => {
+  if (!data) return true;
+  
+  const ignoreKeys = ["pageViews", "shareCount", "trendingScore", "updatedAt", "views"];
+  const keys = Object.keys(data);
+  
+  // 1. If it is a partial update containing only stats fields, do NOT invalidate
+  const hasOtherKeys = keys.some(key => !ignoreKeys.includes(key));
+  if (!hasOtherKeys) {
+    return false;
+  }
+
+  // 2. If it is a full document save (contains all fields), compare with existing cache
+  const cached = cacheStore[colName];
+  if (cached && docId) {
+    const cachedDocSnap = cached.snapshot.docs?.find(d => d.id === docId);
+    if (cachedDocSnap) {
+      const prevData = cachedDocSnap.data();
+      const allKeys = new Set([...Object.keys(prevData), ...keys]);
+      for (const key of allKeys) {
+        if (ignoreKeys.includes(key)) continue;
+        
+        const prevVal = prevData[key];
+        const nextVal = data[key];
+        
+        // Handle dates and timestamps
+        const prevTime = prevVal && typeof prevVal.toDate === "function" 
+          ? prevVal.toDate().getTime() 
+          : (prevVal instanceof Date ? prevVal.getTime() : null);
+          
+        const nextTime = nextVal instanceof Date 
+          ? nextVal.getTime() 
+          : (typeof nextVal === "string" || typeof nextVal === "number" ? new Date(nextVal).getTime() : null);
+          
+        if (prevTime !== null || nextTime !== null) {
+          if (prevTime !== nextTime) return true;
+          continue;
+        }
+        
+        if (String(prevVal || "") !== String(nextVal || "")) {
+          return true;
+        }
+      }
+      return false; // All non-stats fields are identical! Do NOT invalidate cache.
+    }
+  }
+
+  return true;
+};
+
 const wrapFirestoreDbWithCaching = (rawDb) => {
   return {
     collection: (colName) => {
@@ -126,11 +176,15 @@ const wrapFirestoreDbWithCaching = (rawDb) => {
             id: rawDoc.id,
             get: () => rawDoc.get(),
             set: async (data, options) => {
-              invalidateCache(colName);
+              if (shouldInvalidate(colName, rawDoc.id, data)) {
+                invalidateCache(colName);
+              }
               return await rawDoc.set(data, options);
             },
             update: async (data) => {
-              invalidateCache(colName);
+              if (shouldInvalidate(colName, rawDoc.id, data)) {
+                invalidateCache(colName);
+              }
               return await rawDoc.update(data);
             },
             delete: async () => {
@@ -289,6 +343,7 @@ const initializeFirebase = () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           publishedAt: new Date(),
+          category: "education",
         },
         "art-2": {
           title: "Evening health camp draws strong turnout in Chainpur",
@@ -307,6 +362,7 @@ const initializeFirebase = () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           publishedAt: new Date(),
+          category: "health",
         }
       };
       

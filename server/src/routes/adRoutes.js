@@ -10,6 +10,9 @@ import {
   rejectAdvertisement,
   updateAdvertisement,
   verifyAdvertisementPayment,
+  getActiveInArticleAds,
+  incrementAdImpression,
+  incrementAdClick,
 } from "../controllers/adController.js";
 import { authorize, protect } from "../middlewares/auth.js";
 import { roles } from "../utils/constants.js";
@@ -20,6 +23,10 @@ router.get("/form-options", getAdvertisementFormOptions);
 router.get("/active", getActiveAdvertisements);
 router.post("/request", createAdvertisementRequest);
 router.post("/:id/verify-payment", verifyAdvertisementPayment);
+router.get("/in-article/:articleId", getActiveInArticleAds);
+router.post("/:id/impression", incrementAdImpression);
+router.post("/:id/click", incrementAdClick);
+
 router.get("/", protect, authorize(roles.SUPER_ADMIN), getAllAdvertisements);
 router.post("/", protect, authorize(roles.SUPER_ADMIN), createAdvertisement);
 router.patch("/:id", protect, authorize(roles.SUPER_ADMIN), updateAdvertisement);

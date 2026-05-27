@@ -112,7 +112,7 @@ export const getDashboardPayload = asyncHandler(async (req, res) => {
       
       ContactMessage.find({}).sort({ createdAt: -1 }),
       
-      Article.find({ author: userId }).populate("author", "fullName district area").sort({ createdAt: -1 }),
+      Article.find({}).populate("author", "fullName district area").sort({ createdAt: -1 }),
       
       Article.find({
         status: articleStatuses.PUBLISHED,

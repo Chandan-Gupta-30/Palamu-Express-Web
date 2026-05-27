@@ -16,6 +16,8 @@ import { ContactPage } from "./pages/ContactPage";
 import { AdvertisePage } from "./pages/AdvertisePage";
 import { VerificationPage } from "./pages/VerificationPage";
 import { useAuth } from "./context/AuthContext";
+import { io } from "socket.io-client";
+import { runtimeConfig } from "./config/runtime";
 
 const canAccessDashboard = (user) =>
   ["super_admin", "chief_editor", "reporter"].includes(user?.role);
@@ -51,11 +53,26 @@ export default function App() {
   }, [darkMode]);
 
   const isVerifyPage = location.pathname.startsWith("/verify/");
+  const isDashboardPage = location.pathname.startsWith("/dashboard");
+  const hideLayout = isVerifyPage || isDashboardPage;
+
+
+
+  useEffect(() => {
+    if (isDashboardPage) return undefined;
+
+    const socket = io(runtimeConfig.socketUrl);
+    socket.emit("analytics:join-public");
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [isDashboardPage]);
 
   return (
     <div className="min-h-screen">
       <ScrollToTop />
-      {!isVerifyPage && <Header darkMode={darkMode} onToggleDarkMode={() => setDarkMode((value) => !value)} />}
+      {!hideLayout && <Header darkMode={darkMode} onToggleDarkMode={() => setDarkMode((value) => !value)} />}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/article/:slug" element={<ArticlePage />} />
@@ -85,7 +102,7 @@ export default function App() {
         />
       </Routes>
       {location.pathname === "/" ? <WhatsAppChannelButton /> : null}
-      {!isVerifyPage && <Footer />}
+      {!hideLayout && <Footer />}
     </div>
   );
 }

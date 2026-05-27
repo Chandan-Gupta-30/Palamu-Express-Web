@@ -5,11 +5,13 @@ class ContactMessageDocument extends FirestoreDocument {
     super(modelClass, data);
     if (this.status === undefined) this.status = "new";
     if (this.adminNote === undefined) this.adminNote = "";
+    if (this.userId === undefined) this.userId = "";
   }
 
   async preSave(rawData) {
     if (rawData.status === undefined) rawData.status = "new";
     if (rawData.adminNote === undefined) rawData.adminNote = "";
+    if (rawData.userId === undefined) rawData.userId = "";
   }
 }
 

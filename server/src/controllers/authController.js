@@ -7,6 +7,7 @@ import { signToken } from "../utils/jwt.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { approvalStatuses, roles } from "../utils/constants.js";
 import { uploadBase64Asset } from "../services/uploadService.js";
+import { sendEmail } from "../utils/mailer.js";
 
 const emailOtpStore = {};
 const EMAIL_OTP_TTL = 10 * 60 * 1000; // 10 minutes
@@ -64,6 +65,31 @@ export const register = asyncHandler(async (req, res) => {
     bloodGroup,
     education,
   } = req.body;
+
+  // Ensure unique phone number
+  const existingPhone = String(phone || "").trim();
+  const existingPhoneUser = await User.findOne({ phone: existingPhone });
+  if (existingPhoneUser) {
+    return res.status(StatusCodes.CONFLICT).json({
+      message: "This mobile phone number is already registered. Please sign in or use another number.",
+    });
+  }
+
+  // Ensure unique email address
+  if (email) {
+    const existingEmail = String(email || "").trim().toLowerCase();
+    const existingEmailUser = await User.findOne({
+      $or: [
+        { email: existingEmail },
+        { email: String(email || "").trim() }
+      ]
+    });
+    if (existingEmailUser) {
+      return res.status(StatusCodes.CONFLICT).json({
+        message: "This email address is already registered. Please sign in or use another email.",
+      });
+    }
+  }
 
   if ([roles.REPORTER, roles.CHIEF_EDITOR].includes(role) && (!district || !area || !aadhaarNumber)) {
     return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
@@ -366,4 +392,262 @@ export const verifyEmailOtp = asyncHandler(async (req, res) => {
 
   await deleteEmailOtp(email);
   res.json({ success: true, message: "Email address verified successfully!" });
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const identifier = String(req.body.identifier || "").trim();
+
+  if (!identifier) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: "Please provide your email address or mobile number." });
+  }
+
+  const user = await User.findOne({
+    $or: [
+      { email: identifier },
+      { email: identifier.toLowerCase() },
+      { phone: identifier },
+    ],
+  });
+
+  if (!user) {
+    return res.status(StatusCodes.NOT_FOUND).json({ message: "No account found matching that email or phone number." });
+  }
+
+  if (!user.email) {
+    return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+      message: "This account does not have a registered email address. Please contact the super admin to recover your account.",
+    });
+  }
+
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let tempPassword = "PE-";
+  for (let i = 0; i < 6; i++) {
+    tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  user.password = tempPassword;
+  await user.save();
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Temporary Password Recovery - Palamu Express</title>
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          background-color: #05070c;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          color: #cbd5e1;
+        }
+        .container {
+          max-width: 600px;
+          margin: 40px auto;
+          background: linear-gradient(180deg, #090d16 0%, #05070c 100%);
+          border: 1px solid rgba(251, 146, 60, 0.15);
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+        .header {
+          padding: 30px 20px;
+          text-align: center;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(251, 146, 60, 0.03);
+        }
+        .logo {
+          display: inline-block;
+          background-color: #f97316;
+          color: #ffffff;
+          font-weight: 800;
+          font-size: 16px;
+          padding: 8px 16px;
+          border-radius: 12px;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          margin-bottom: 8px;
+        }
+        .header-title {
+          font-size: 20px;
+          color: #ffffff;
+          font-weight: 700;
+          margin: 8px 0 0 0;
+          letter-spacing: 0.5px;
+        }
+        .body {
+          padding: 40px 30px;
+        }
+        .welcome {
+          font-size: 16px;
+          font-weight: 600;
+          color: #ffffff;
+          margin-top: 0;
+          margin-bottom: 16px;
+        }
+        .paragraph {
+          font-size: 14px;
+          line-height: 1.6;
+          color: #94a3b8;
+          margin-top: 0;
+          margin-bottom: 24px;
+        }
+        .credentials-card {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
+          padding: 24px;
+          margin-bottom: 28px;
+        }
+        .credential-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 8px 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .credential-row:last-child {
+          border-bottom: none;
+        }
+        .credential-label {
+          font-size: 13px;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          font-weight: 600;
+        }
+        .credential-value {
+          font-size: 14px;
+          color: #f1f5f9;
+          font-weight: 600;
+        }
+        .credential-value.password-value {
+          font-family: "Courier New", Courier, monospace;
+          color: #f97316;
+          font-size: 16px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+        }
+        .instructions {
+          background: rgba(16, 185, 129, 0.05);
+          border-left: 4px solid #10b981;
+          padding: 16px;
+          border-radius: 8px;
+          margin-bottom: 28px;
+        }
+        .instructions-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #10b981;
+          margin-top: 0;
+          margin-bottom: 6px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .instructions-list {
+          margin: 0;
+          padding-left: 20px;
+          font-size: 13px;
+          color: #94a3b8;
+          line-height: 1.5;
+        }
+        .instructions-list li {
+          margin-bottom: 6px;
+        }
+        .instructions-list li:last-child {
+          margin-bottom: 0;
+        }
+        .button-wrapper {
+          text-align: center;
+          margin-bottom: 28px;
+        }
+        .btn {
+          display: inline-block;
+          background-color: #f97316;
+          color: #ffffff;
+          text-decoration: none;
+          font-weight: 700;
+          font-size: 14px;
+          padding: 12px 30px;
+          border-radius: 14px;
+          box-shadow: 0 10px 20px rgba(249, 115, 22, 0.2);
+          transition: background-color 0.2s;
+        }
+        .btn:hover {
+          background-color: #ea580c;
+        }
+        .footer {
+          padding: 30px 20px;
+          text-align: center;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(0, 0, 0, 0.2);
+        }
+        .footer-text {
+          font-size: 11px;
+          color: #475569;
+          margin: 0;
+          line-height: 1.5;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">PE</div>
+          <h1 class="header-title">Palamu Express Newsroom</h1>
+        </div>
+        <div class="body">
+          <p class="welcome">Hello, ${user.fullName || "Newsroom Partner"}</p>
+          <p class="paragraph">
+            We received a request to recover the login credentials for your Palamu Express Digital Media account. 
+            A temporary password has been successfully generated and applied to your account.
+          </p>
+          
+          <div class="credentials-card">
+            <div class="credential-row">
+              <span class="credential-label">Login Identifier</span>
+              <span class="credential-value">${user.phone} (Mobile)</span>
+            </div>
+            <div class="credential-row">
+              <span class="credential-label">Temporary Password</span>
+              <span class="credential-value password-value">${tempPassword}</span>
+            </div>
+          </div>
+          
+          <div class="instructions">
+            <h3 class="instructions-title">Next Steps for Access</h3>
+            <ol class="instructions-list">
+              <li>Open the sign-in portal and enter your 10-digit login mobile number.</li>
+              <li>Copy and paste the temporary password: <strong>${tempPassword}</strong>.</li>
+              <li>Once logged in, immediately click on <strong>Account Settings</strong> in the sidebar to update your password to a secure personal one.</li>
+            </ol>
+          </div>
+          
+          <div class="button-wrapper">
+            <a href="${process.env.CLIENT_URL || "http://localhost:5173"}/login" class="btn" target="_blank">Access Newsroom Dashboard</a>
+          </div>
+        </div>
+        <div class="footer">
+          <p class="footer-text">
+            Palamu Express Digital Media Portal © 2026. All rights reserved.<br>
+            If you did not initiate this recovery request, please change your password immediately or contact super admin support.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const emailResult = await sendEmail({
+    to: user.email,
+    subject: "Your Temporary Login Password - Palamu Express",
+    html: htmlContent,
+  });
+
+  res.json({
+    success: true,
+    message: `A temporary recovery password has been dispatched to your registered email address (${user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3")}).`,
+    previewUrl: emailResult?.previewUrl || null,
+  });
 });

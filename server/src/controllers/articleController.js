@@ -2,7 +2,7 @@ import { StatusCodes } from "http-status-codes";
 import { Article } from "../models/Article.js";
 import { Analytics } from "../models/Analytics.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { approvalStatuses, articleStatuses, roles } from "../utils/constants.js";
+import { approvalStatuses, articleStatuses, roles, articleCategories } from "../utils/constants.js";
 import { generateVoiceDraft, summarizeArticle } from "../services/geminiService.js";
 import { uploadBase64Asset } from "../services/uploadService.js";
 import { env } from "../config/env.js";
@@ -75,6 +75,16 @@ const buildArticlePayload = async (body) => {
     };
   }
 
+  const category = String(body.category || "").trim();
+  if (!category || !Object.values(articleCategories).includes(category)) {
+    return {
+      error: {
+        status: StatusCodes.BAD_REQUEST,
+        message: "Please select a valid news category",
+      },
+    };
+  }
+
   return {
     payload: {
       title: String(body.title || "").trim(),
@@ -90,6 +100,7 @@ const buildArticlePayload = async (body) => {
       panchayat: String(body.panchayat || "").trim(),
       breaking: Boolean(body.breaking),
       tags: Array.isArray(body.tags) ? body.tags : undefined,
+      category,
     },
   };
 };
@@ -208,6 +219,11 @@ export const getHomepageFeed = asyncHandler(async (req, res) => {
     publishedQuery.publishedAt = { $gte: start, $lt: end };
   }
 
+  const category = String(req.query.category || "").trim();
+  if (category) {
+    publishedQuery.category = category;
+  }
+
   const totalLatest = await Article.countDocuments(publishedQuery);
   const totalPages = totalLatest ? Math.ceil(totalLatest / latestPageSize) : 0;
   const safePage = totalPages ? Math.min(page, totalPages) : 1;
@@ -284,7 +300,7 @@ export const getHomepageFeed = asyncHandler(async (req, res) => {
 });
 
 export const getArticles = asyncHandler(async (req, res) => {
-  const { district, area, keyword, status = articleStatuses.PUBLISHED, mine } = req.query;
+  const { district, area, category, keyword, status = articleStatuses.PUBLISHED, mine } = req.query;
   const query = {};
 
   if (status !== "all") {
@@ -293,6 +309,7 @@ export const getArticles = asyncHandler(async (req, res) => {
 
   if (district) query.district = district;
   if (area) query.area = area;
+  if (category) query.category = category;
   if (keyword) query.$text = { $search: keyword };
   if (mine === "true" && req.user) query.author = req.user._id;
 
@@ -388,7 +405,37 @@ export const incrementArticleView = asyncHandler(async (req, res) => {
     pageViews: article.pageViews,
   });
 
+  req.io?.to("newsroom:analytics").emit("analytics:live-update", {
+    slug: article.slug,
+    pageViews: article.pageViews,
+    authorId: String(article.author),
+  });
+
   res.json({ pageViews: article.pageViews });
+});
+
+export const incrementArticleShare = asyncHandler(async (req, res) => {
+  const article = await Article.findOne({ slug: req.params.slug });
+  if (!article) {
+    return res.status(StatusCodes.NOT_FOUND).json({ message: "Article not found" });
+  }
+
+  article.shareCount = (article.shareCount || 0) + 1;
+  article.trendingScore += 2;
+  await article.save();
+
+  req.io?.to(`article:${article.slug}`).emit("analytics:update", {
+    slug: article.slug,
+    shareCount: article.shareCount,
+  });
+
+  req.io?.to("newsroom:analytics").emit("analytics:live-update", {
+    slug: article.slug,
+    shareCount: article.shareCount,
+    authorId: String(article.author),
+  });
+
+  res.json({ shareCount: article.shareCount });
 });
 
 export const approveArticle = asyncHandler(async (req, res) => {
@@ -514,16 +561,14 @@ export const getPublishedArticlesByDate = asyncHandler(async (req, res) => {
   }
 
   const selectedDate = String(req.query.date || "").trim();
+  const query = { status: articleStatuses.PUBLISHED };
 
-  if (!selectedDate) {
-    return res.status(StatusCodes.BAD_REQUEST).json({ message: "A date is required" });
+  if (selectedDate) {
+    const { start, end } = getDayRange(selectedDate);
+    query.publishedAt = { $gte: start, $lt: end };
   }
 
-  const { start, end } = getDayRange(selectedDate);
-  const articles = await Article.find({
-    status: articleStatuses.PUBLISHED,
-    publishedAt: { $gte: start, $lt: end },
-  })
+  const articles = await Article.find(query)
     .populate("author", "fullName district area")
     .sort({ publishedAt: -1, createdAt: -1 });
 

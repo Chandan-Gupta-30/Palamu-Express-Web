@@ -8,7 +8,10 @@ import { initializeSocket } from "./socket/index.js";
 const bootstrap = async () => {
   await connectDb();
 
-  const server = http.createServer();
+  const ioRef = { current: null };
+  const app = createApp(ioRef);
+
+  const server = http.createServer(app);
   const io = new Server(server, {
     cors: {
       origin: env.clientUrls,
@@ -16,11 +19,9 @@ const bootstrap = async () => {
     },
   });
 
-  initializeSocket(io);
+  ioRef.current = io;
 
-  const app = createApp(io);
-  server.removeAllListeners("request");
-  server.on("request", app);
+  initializeSocket(io);
 
   server.listen(env.port, () => {
     console.log(`Server listening on ${env.port}`);

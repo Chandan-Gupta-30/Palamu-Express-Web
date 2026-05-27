@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { body } from "express-validator";
-import { login, register, seedSuperAdmin, verifyPhoneOtp, checkEmailVerification, mockVerifyEmailLink, sendEmailOtp, verifyEmailOtp } from "../controllers/authController.js";
+import { login, register, seedSuperAdmin, verifyPhoneOtp, checkEmailVerification, mockVerifyEmailLink, sendEmailOtp, verifyEmailOtp, forgotPassword } from "../controllers/authController.js";
 import { validate } from "../middlewares/validate.js";
 
 const router = Router();
@@ -23,6 +23,7 @@ router.get("/check-email-verification/:userId", checkEmailVerification);
 router.get("/mock-verify-email/:email", mockVerifyEmailLink);
 router.post("/send-email-otp", sendEmailOtp);
 router.post("/verify-email-otp", verifyEmailOtp);
+router.post("/forgot-password", [body("identifier").notEmpty()], validate, forgotPassword);
 router.post("/seed-super-admin", seedSuperAdmin);
 
 export default router;

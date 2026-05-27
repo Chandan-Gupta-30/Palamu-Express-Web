@@ -15,3 +15,8 @@ coverage
 *.log
 client/node_modules
 server/node_modules
+
+# Secrets and Credentials
+*.firebase-service-account.json
+*service-account*.json
+*.patch
