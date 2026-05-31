@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Languages, Mic, Radio, RotateCcw, Square, Volume2, Waves, X } from "lucide-react";
 import { http } from "../../api/http";
-import { jharkhandBlocksByDistrict, jharkhandDistricts } from "../../data/districts";
+import { jharkhandBlocksByDistrict, jharkhandDistricts, newsCategories, newsCategoryLabels } from "../../data/districts";
 import { ImagePicker } from "../onboarding/ImagePicker";
 import { AudioWaveform } from "./AudioWaveform";
 import { formatAudioDuration, normalizeWaveformBars } from "../../utils/audio";
@@ -11,6 +11,7 @@ const initialVoiceForm = {
   excerpt: "",
   district: "",
   area: "",
+  category: "",
   content: "",
   breaking: false,
   coverImageUrl: "",
@@ -67,6 +68,18 @@ const DictationButton = ({ active, disabled, onClick }) => (
           : "text-inherit"
       }`} 
     />
+  </button>
+);
+
+const ResetButton = ({ disabled, onClick }) => (
+  <button
+    type="button"
+    disabled={disabled}
+    onClick={onClick}
+    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-400 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-30"
+    title="Reset field content"
+  >
+    <RotateCcw size={15} />
   </button>
 );
 
@@ -142,6 +155,9 @@ export const VoiceNewsComposer = ({
     }
 
     stopFieldDictation();
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setForm({
       ...initialVoiceForm,
       district: defaultDistrict || "",
@@ -210,6 +226,9 @@ export const VoiceNewsComposer = ({
     if (!open) {
       cleanupMedia();
       stopFieldDictation();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
       resetComposer();
       return;
     }
@@ -223,6 +242,9 @@ export const VoiceNewsComposer = ({
     return () => {
       cleanupMedia();
       stopFieldDictation();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, [open, defaultDistrict, defaultArea]);
 
@@ -636,14 +658,18 @@ export const VoiceNewsComposer = ({
                 ) : null}
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <div className="flex items-start gap-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="md:col-span-2 lg:col-span-3">
+                  <div className="flex items-center gap-3">
                     <input
-                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 transition"
                       placeholder="Voice bulletin headline"
                       value={form.title}
                       onChange={(event) => updateFieldValue("title", event.target.value)}
+                    />
+                    <ResetButton
+                      disabled={!form.title}
+                      onClick={() => updateFieldValue("title", "")}
                     />
                     <DictationButton
                       active={activeDictationField === "title"}
@@ -653,67 +679,103 @@ export const VoiceNewsComposer = ({
                   </div>
                 </div>
 
-                <select
-                  className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
-                  value={form.district}
-                  onChange={(event) => setForm({ ...form, district: event.target.value, area: "" })}
-                >
-                  <option value="">Select district</option>
-                  {jharkhandDistricts.map((district) => (
-                    <option key={district} value={district}>
-                      {district}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2 lg:col-span-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 pl-1">District</label>
+                    <select
+                      className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition"
+                      value={form.district}
+                      onChange={(event) => setForm({ ...form, district: event.target.value, area: "" })}
+                    >
+                      <option value="">Select district</option>
+                      {jharkhandDistricts.map((district) => (
+                        <option key={district} value={district}>
+                          {district}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <select
-                  className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
-                  value={form.area}
-                  onChange={(event) => setForm({ ...form, area: event.target.value })}
-                >
-                  <option value="">Select block</option>
-                  {blockOptions.map((block) => (
-                    <option key={block} value={block}>
-                      {block}
-                    </option>
-                  ))}
-                </select>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 pl-1">Block / Area</label>
+                    <select
+                      className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition"
+                      value={form.area}
+                      onChange={(event) => setForm({ ...form, area: event.target.value })}
+                    >
+                      <option value="">Select block</option>
+                      {blockOptions.map((block) => (
+                        <option key={block} value={block}>
+                          {block}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 lg:col-span-3 flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 pl-1">Category</label>
+                  <select
+                    className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition"
+                    value={form.category}
+                    onChange={(event) => setForm({ ...form, category: event.target.value })}
+                  >
+                    <option value="">Select category</option>
+                    {newsCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {newsCategoryLabels[category]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-3">
                   <div className="flex items-start gap-3">
                     <textarea
-                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 transition"
                       rows="3"
                       placeholder="Short excerpt for homepage cards"
                       value={form.excerpt}
                       onChange={(event) => updateFieldValue("excerpt", event.target.value)}
                     />
-                    <DictationButton
-                      active={activeDictationField === "excerpt"}
-                      disabled={!browserSpeechSupported}
-                      onClick={() => startFieldDictation("excerpt")}
-                    />
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <ResetButton
+                        disabled={!form.excerpt}
+                        onClick={() => updateFieldValue("excerpt", "")}
+                      />
+                      <DictationButton
+                        active={activeDictationField === "excerpt"}
+                        disabled={!browserSpeechSupported}
+                        onClick={() => startFieldDictation("excerpt")}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 lg:col-span-3">
                   <div className="flex items-start gap-3">
                     <textarea
-                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 transition"
                       rows="5"
                       placeholder="Written story notes for readers. Use browser dictation, then correct the grammar manually."
                       value={form.content}
                       onChange={(event) => updateFieldValue("content", event.target.value)}
                     />
-                    <DictationButton
-                      active={activeDictationField === "content"}
-                      disabled={!browserSpeechSupported}
-                      onClick={() => startFieldDictation("content")}
-                    />
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <ResetButton
+                        disabled={!form.content}
+                        onClick={() => updateFieldValue("content", "")}
+                      />
+                      <DictationButton
+                        active={activeDictationField === "content"}
+                        disabled={!browserSpeechSupported}
+                        onClick={() => startFieldDictation("content")}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 lg:col-span-3">
                   <ImagePicker
                     label="Voice News Cover Image"
                     helpText="Upload a cover image for the voice bulletin, or use the direct image URL field below if the image is already hosted."
@@ -722,14 +784,18 @@ export const VoiceNewsComposer = ({
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 lg:col-span-3">
                   <div className="flex items-start gap-3">
                     <input
                       type="url"
-                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 transition"
                       placeholder="Optional direct image URL, for example https://example.com/voice-news-cover.jpg"
                       value={String(form.coverImageUrl || "").startsWith("data:") ? "" : form.coverImageUrl}
                       onChange={(event) => setForm({ ...form, coverImageUrl: event.target.value })}
+                    />
+                    <ResetButton
+                      disabled={!form.coverImageUrl}
+                      onClick={() => setForm({ ...form, coverImageUrl: "" })}
                     />
                     <DictationButton
                       active={activeDictationField === "coverImageUrl"}
@@ -738,11 +804,11 @@ export const VoiceNewsComposer = ({
                     />
                   </div>
                   <p className="mt-2 text-xs text-slate-500">
-                    Use this only when you do not want to upload an image file. District and block still need manual selection.
+                    Use this only when you do not want to upload an image file. District, block, and category still need manual selection.
                   </p>
                 </div>
 
-                <label className="flex items-center gap-3 text-sm text-slate-400 md:col-span-2">
+                <label className="flex items-center gap-3 text-sm text-slate-400 md:col-span-2 lg:col-span-3">
                   <input
                     type="checkbox"
                     checked={form.breaking}

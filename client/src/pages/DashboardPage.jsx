@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, FilePlus2, FolderKanban, IdCard, KeyRound, Megaphone, Mic, X, LayoutDashboard, Users, UserCheck, Inbox, Settings, BookOpen, AlertCircle, Calendar, ShieldAlert, BadgeCheck, FileText, CheckSquare, Layers, Menu, Lock, LogOut, Home, Activity, TrendingUp, Share2, Phone, Mail, MapPin, Award, Droplet, GraduationCap, Trash2, UserX, ShieldCheck, Check, Edit3, Bell, BellOff, Sliders, ChevronLeft, ChevronRight, Plus, List, LayoutGrid, FileSpreadsheet } from "lucide-react";
+import { Eye, EyeOff, FilePlus2, FolderKanban, IdCard, KeyRound, Megaphone, Mic, X, LayoutDashboard, Users, UserCheck, Inbox, Settings, BookOpen, AlertCircle, Calendar, ShieldAlert, BadgeCheck, FileText, CheckSquare, Layers, Menu, Lock, LogOut, Home, Activity, TrendingUp, Share2, Phone, Mail, MapPin, Award, Globe, Droplet, GraduationCap, Trash2, UserX, ShieldCheck, Check, Edit3, Bell, BellOff, Sliders, ChevronLeft, ChevronRight, Plus, List, LayoutGrid, FileSpreadsheet, Download, Sun, Moon, Square, Upload, Newspaper, Play, Pause } from "lucide-react";
 import { Line, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -28,6 +28,7 @@ ChartJS.register(
 );
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { VoiceNewsComposer } from "../components/audio/VoiceNewsComposer";
+import { AudioWaveform } from "../components/audio/AudioWaveform";
 import { MetricCard } from "../components/dashboard/MetricCard";
 import { IDCardPreview } from "../components/dashboard/IDCardPreview";
 import { PublishedArchiveSection } from "../components/dashboard/PublishedArchiveSection";
@@ -45,13 +46,16 @@ const adPlacements = [
   { value: "homepage-hero", label: "Homepage Hero Rail", hint: "Shows near the top of the homepage beside the lead story." },
   { value: "homepage-latest", label: "Latest Updates Sponsor Grid", hint: "Appears between headline sections without breaking article flow." },
   { value: "homepage-district", label: "District Coverage Sponsor Strip", hint: "Shows lower on the homepage near district-wise coverage." },
+  { value: "homepage-popup", label: "Homepage Premium Pop-up Ad", hint: "Ejects a beautiful premium backdrop-blurred pop-up ad upon homepage load." },
   { value: "in-article", label: "In-Article Sponsor Injection", hint: "Injects custom sponsor banners directly inside news articles." },
+  { value: "promotional-article", label: "Promotional Launch Article", hint: "Creates a fully approved, premium article under Promotions & Launches." },
 ];
 
 const adStatuses = [
   { value: "pending_payment", label: "Pending Payment" },
   { value: "pending_approval", label: "Pending Approval" },
   { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
   { value: "expired", label: "Expired" },
   { value: "rejected", label: "Rejected" },
 ];
@@ -107,6 +111,12 @@ const initialAdForm = {
   ctaLabel: "Visit Sponsor",
   notes: "",
   status: "active",
+  promotionalContent: "",
+  district: "Palamu",
+  block: "Medininagar",
+  targetDistricts: [],
+  targetBlocks: [],
+  timeTargeting: { startHour: 0, endHour: 24 },
 };
 
 const initialInArticleAdForm = {
@@ -117,11 +127,13 @@ const initialInArticleAdForm = {
   adPosition: "middle",
   paragraphIndex: 2,
   durationDays: 7,
+  amount: 0,
   priority: 10,
   ctaLabel: "Visit Sponsor",
   description: "",
   notes: "",
   status: "active",
+  articleId: "",
 };
 
 const initialManagedUserForm = {
@@ -149,6 +161,14 @@ const initialCredentialForm = {
   currentPassword: "",
   newPassword: "",
   confirmNewPassword: "",
+  district: "",
+  area: "",
+  aadhaarNumber: "",
+  bloodGroup: "O+",
+  education: "",
+  profilePhotoUrl: "",
+  aadhaarImageUrl: "",
+  livePhotoUrl: "",
 };
 
 const initialContactAdminForm = {
@@ -182,11 +202,13 @@ const joinMetaParts = (...parts) => parts.filter(Boolean).join(" | ");
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
-const dedupeArticlesById = (articles = []) => {
+const dedupeArticlesById = (articles) => {
+  if (!Array.isArray(articles)) return [];
   const seen = new Set();
 
   return articles.filter((article) => {
-    const id = article?._id || article?.slug;
+    if (!article) return false;
+    const id = article._id || article.slug;
     if (!id || seen.has(id)) return false;
     seen.add(id);
     return true;
@@ -225,6 +247,10 @@ const ConfirmActionModal = ({
   busy = false,
   cancelLabel = "Cancel",
   kicker = "Confirm Action",
+  showInput = false,
+  inputValue = "",
+  onInputChange,
+  inputPlaceholder = "Provide detailed reason or feedback here...",
 }) => {
   if (!open) return null;
 
@@ -249,6 +275,17 @@ const ConfirmActionModal = ({
 
         <p className="mt-4 text-sm leading-7 text-slate-300">{description}</p>
 
+        {showInput && (
+          <div className="mt-4">
+            <textarea
+              className="w-full min-h-[100px] rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 placeholder-slate-500 transition duration-200 resize-none"
+              placeholder={inputPlaceholder}
+              value={inputValue}
+              onChange={(e) => onInputChange && onInputChange(e.target.value)}
+            />
+          </div>
+        )}
+
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button
             type="button"
@@ -264,7 +301,7 @@ const ConfirmActionModal = ({
             disabled={busy}
             className="rounded-full bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {busy ? "Deleting..." : confirmLabel}
+            {busy ? "Processing..." : confirmLabel}
           </button>
         </div>
       </div>
@@ -276,15 +313,20 @@ let dashboardCache = null;
 let dashboardCacheTimestamp = 0;
 const DASHBOARD_CACHE_TTL = 15 * 1000; // Cache dashboard data for 15 seconds
 
-export const DashboardPage = () => {
+export const DashboardPage = ({ darkMode, onToggleDarkMode }) => {
   const { user, refreshUser, logout } = useAuth();
   const navigate = useNavigate();
+  
+  const chartGridColor = darkMode ? "rgba(255, 255, 255, 0.05)" : "rgba(15, 23, 42, 0.08)";
+  const chartTicksColor = darkMode ? "rgba(148, 163, 184, 0.7)" : "#475569";
+  const chartLegendColor = darkMode ? "#ffffff" : "#0f172a";
   const [metrics, setMetrics] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsSearch, setAnalyticsSearch] = useState("");
   const [analyticsSort, setAnalyticsSort] = useState("views-desc");
   const [analyticsAdSearch, setAnalyticsAdSearch] = useState("");
+  const [analyticsAdTab, setAnalyticsAdTab] = useState("all");
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -309,6 +351,7 @@ export const DashboardPage = () => {
   const [pendingUserSearch, setPendingUserSearch] = useState("");
   const [managedUserSearch, setManagedUserSearch] = useState("");
   const [selectedManagedUser, setSelectedManagedUser] = useState(null);
+  const [selectedPendingUser, setSelectedPendingUser] = useState(null);
   const [managedUserStatusFilter, setManagedUserStatusFilter] = useState("all");
   const [pendingArticleSearch, setPendingArticleSearch] = useState("");
   const [pendingArticlePage, setPendingArticlePage] = useState(1);
@@ -324,6 +367,9 @@ export const DashboardPage = () => {
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [showArchiveDeleteModal, setShowArchiveDeleteModal] = useState(false);
   const [pendingAdDelete, setPendingAdDelete] = useState(null);
+  const [pendingAdPause, setPendingAdPause] = useState(null);
+  const [pendingPauseAllAds, setPendingPauseAllAds] = useState(false);
+  const [inspectingAd, setInspectingAd] = useState(null);
   const [pendingArchiveArticleDelete, setPendingArchiveArticleDelete] = useState(null);
   const [pendingManagedUserDelete, setPendingManagedUserDelete] = useState(null);
   const [pendingArticleDeleteId, setPendingArticleDeleteId] = useState(null);
@@ -380,10 +426,21 @@ export const DashboardPage = () => {
   const [showAdRequestsPanel, setShowAdRequestsPanel] = useState(false);
   const [adSearch, setAdSearch] = useState("");
   const [adStatusFilter, setAdStatusFilter] = useState("all");
+  const [adPlacementFilter, setAdPlacementFilter] = useState("all");
   const [adDateFilter, setAdDateFilter] = useState("");
   const [adViewMode, setAdViewMode] = useState("table");
   const [globalIdCardExpiry, setGlobalIdCardExpiry] = useState("");
   const [globalExpiryForm, setGlobalExpiryForm] = useState("");
+  const [adPricingHero, setAdPricingHero] = useState(699);
+  const [adPricingLatest, setAdPricingLatest] = useState(499);
+  const [adPricingDistrict, setAdPricingDistrict] = useState(299);
+  const [adPricingPopup, setAdPricingPopup] = useState(999);
+  const [adPricingInArticle, setAdPricingInArticle] = useState(199);
+  const [adPricingPromotional, setAdPricingPromotional] = useState(199);
+  const [popupDisplayMode, setPopupDisplayMode] = useState("weighted_random");
+  const [popupLockedAdId, setPopupLockedAdId] = useState("");
+  const [districtInput, setDistrictInput] = useState("Palamu");
+  const [blockInput, setBlockInput] = useState("");
   const [inArticleSearch, setInArticleSearch] = useState("");
   const [selectedAdArticle, setSelectedAdArticle] = useState(null);
   const [showManageInArticleAdsModal, setShowManageInArticleAdsModal] = useState(false);
@@ -395,6 +452,275 @@ export const DashboardPage = () => {
   const [allArticlesLoading, setAllArticlesLoading] = useState(false);
   const [inArticlePage, setInArticlePage] = useState(1);
   const [inArticlePageSize, setInArticlePageSize] = useState(5);
+
+  // Microphone voice re-recording states for editing voice news
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const recordingStartRef = useRef(0);
+
+  // Staged audio states for previewing before replacing
+  const [stagedAudioUrl, setStagedAudioUrl] = useState("");
+  const [stagedAudioDuration, setStagedAudioDuration] = useState(0);
+  const [stagedAudioWaveform, setStagedAudioWaveform] = useState([]);
+  const [stagedAudioName, setStagedAudioName] = useState("");
+
+  // Live wave analysis while recording
+  const [recordingWaveform, setRecordingWaveform] = useState([]);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const sourceRef = useRef(null);
+  const animationFrameRef = useRef(0);
+
+  const formatDuration = (secs) => {
+    if (isNaN(secs) || secs === Infinity) return "0:00";
+    const minutes = Math.floor(secs / 60);
+    const seconds = Math.floor(secs % 60);
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+  };
+
+  const beginRecordingWaveformMonitoring = (stream) => {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    try {
+      const audioContext = new AudioContextClass();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(stream);
+
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      sourceRef.current = source;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const sample = () => {
+        if (!analyserRef.current) return;
+        analyser.getByteFrequencyData(dataArray);
+        const sliceSize = Math.max(1, Math.floor(dataArray.length / 36));
+        const nextWaveform = Array.from({ length: 36 }, (_, index) => {
+          const start = index * sliceSize;
+          const chunk = dataArray.slice(start, start + sliceSize);
+          const average = chunk.reduce((sum, value) => sum + value, 0) / Math.max(chunk.length, 1);
+          return Math.max(0.08, average / 255);
+        });
+
+        setRecordingWaveform(nextWaveform);
+        animationFrameRef.current = requestAnimationFrame(sample);
+      };
+
+      sample();
+    } catch (e) {
+      console.error("Failed to start audio recording waveform analysis:", e);
+    }
+  };
+
+  const stopRecordingWaveformMonitoring = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = 0;
+    }
+
+    sourceRef.current?.disconnect();
+    analyserRef.current?.disconnect();
+    sourceRef.current = null;
+    analyserRef.current = null;
+
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      audioContextRef.current.close().catch(() => {});
+    }
+    audioContextRef.current = null;
+  };
+
+  const startRecordingAudio = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setActionPopup({
+        type: "error",
+        title: "Not Supported",
+        message: "Your browser does not support audio recording.",
+      });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredMimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "";
+
+      const mediaRecorder = new MediaRecorder(stream, preferredMimeType ? { mimeType: preferredMimeType } : undefined);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, {
+          type: preferredMimeType || "audio/webm",
+        });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result;
+          const duration = (Date.now() - recordingStartRef.current) / 1000;
+          const mockWaveform = Array.from({ length: 48 }, () => Math.max(0.1, Math.random()));
+
+          setStagedAudioUrl(base64data);
+          setStagedAudioDuration(duration);
+          setStagedAudioWaveform(mockWaveform);
+          setStagedAudioName(`Microphone Recording (${Math.round(duration)}s)`);
+
+          setActionPopup({
+            type: "success",
+            title: "Recording Staged",
+            message: "Your recorded audio is ready for preview. Review it below and click 'Apply' to replace the article's audio.",
+          });
+        };
+        reader.readAsDataURL(blob);
+
+        stream.getTracks().forEach((track) => track.stop());
+        stopRecordingWaveformMonitoring();
+      };
+
+      mediaRecorder.start(250);
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingStartRef.current = Date.now();
+      setRecordingWaveform(Array(36).fill(0.08));
+      
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((Date.now() - recordingStartRef.current) / 1000);
+      }, 200);
+
+      beginRecordingWaveformMonitoring(stream);
+
+    } catch (err) {
+      console.error(err);
+      setActionPopup({
+        type: "error",
+        title: "Mic Access Denied",
+        message: "Microphone access was denied. Please allow microphone permissions and try again.",
+      });
+    }
+  };
+
+  const stopRecordingAudio = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+  };
+
+  const handleAudioFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("audio/")) {
+      setActionPopup({
+        type: "error",
+        title: "Invalid File",
+        message: "Please choose a valid audio file (MP3, WAV, M4A, WEBM, etc.).",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      const tempAudio = new Audio(dataUrl);
+      tempAudio.onloadedmetadata = () => {
+        const fileDuration = tempAudio.duration || 0;
+        const mockWaveform = Array.from({ length: 48 }, () => Math.max(0.1, Math.random()));
+
+        setStagedAudioUrl(dataUrl);
+        setStagedAudioDuration(fileDuration);
+        setStagedAudioWaveform(mockWaveform);
+        setStagedAudioName(file.name);
+
+        setActionPopup({
+          type: "success",
+          title: "Audio Staged",
+          message: `"${file.name}" loaded and staged for preview. Review it below and click 'Apply' to replace the article's audio.`,
+        });
+      };
+      
+      tempAudio.onerror = () => {
+        const mockWaveform = Array.from({ length: 48 }, () => Math.max(0.1, Math.random()));
+        setStagedAudioUrl(dataUrl);
+        setStagedAudioDuration(0);
+        setStagedAudioWaveform(mockWaveform);
+        setStagedAudioName(file.name);
+        
+        setActionPopup({
+          type: "success",
+          title: "Audio Staged",
+          message: `"${file.name}" loaded and staged (duration could not be read). Click 'Apply' to replace.`,
+        });
+      };
+    };
+    
+    reader.readAsDataURL(file);
+  };
+
+  const applyStagedAudio = () => {
+    if (!stagedAudioUrl) return;
+
+    setArticleForm((current) => ({
+      ...current,
+      audioUrl: stagedAudioUrl,
+      audioDuration: stagedAudioDuration,
+      audioWaveform: stagedAudioWaveform,
+    }));
+
+    setStagedAudioUrl("");
+    setStagedAudioDuration(0);
+    setStagedAudioWaveform([]);
+    setStagedAudioName("");
+
+    setActionPopup({
+      type: "success",
+      title: "Audio Replaced",
+      message: "The new recorded/uploaded audio has been successfully applied and has replaced the old audio.",
+    });
+  };
+
+  const discardStagedAudio = () => {
+    setStagedAudioUrl("");
+    setStagedAudioDuration(0);
+    setStagedAudioWaveform([]);
+    setStagedAudioName("");
+
+    setActionPopup({
+      type: "info",
+      title: "Changes Discarded",
+      message: "The newly recorded/uploaded audio preview has been discarded. The original audio remains unchanged.",
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem("dashboard_active_tab") || "overview";
@@ -413,7 +739,7 @@ export const DashboardPage = () => {
     [adForm.placement]
   );
   const reviewableAds = useMemo(
-    () => ads.filter((ad) => ad.paymentStatus === "paid" && ad.status === "pending_approval"),
+    () => (ads || []).filter((ad) => ad && ad.paymentStatus === "paid" && ad.status === "pending_approval"),
     [ads]
   );
   const pendingAdRequestsCount = useMemo(
@@ -422,7 +748,13 @@ export const DashboardPage = () => {
   );
   const visibleManagedAds = useMemo(
     () =>
-      ads.filter((ad) => {
+      (ads || []).filter((ad) => {
+        if (!ad) return false;
+        if (adPlacementFilter === "all") {
+          if (ad.placement === "in-article") return false;
+        } else {
+          if (ad.placement !== adPlacementFilter) return false;
+        }
         const matchesStatus = adStatusFilter === "all" || ad.status === adStatusFilter;
         const activityDateValue = getAdvertisementActivityDate(ad);
         const activityDate = activityDateValue ? new Date(activityDateValue).toISOString().slice(0, 10) : "";
@@ -431,19 +763,19 @@ export const DashboardPage = () => {
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
-          .includes(adSearch.toLowerCase());
+          .includes((adSearch || "").toLowerCase());
 
         return matchesStatus && matchesDate && matchesSearch;
       }),
-    [ads, adDateFilter, adSearch, adStatusFilter]
+    [ads, adDateFilter, adSearch, adStatusFilter, adPlacementFilter]
   );
 
   const unreadCount = useMemo(() => {
-    return notifications.filter((n) => !n.isRead).length;
+    return (notifications || []).filter((n) => n && !n.isRead).length;
   }, [notifications]);
 
   const unreadQueriesCount = useMemo(() => {
-    return contactMessages.filter((m) => m.status === "new" || m.status === "unresolved").length;
+    return (contactMessages || []).filter((m) => m && (m.status === "new" || m.status === "unresolved")).length;
   }, [contactMessages]);
 
   const currentEditingMessage = useMemo(() => {
@@ -460,9 +792,10 @@ export const DashboardPage = () => {
   const uniqueMyArticles = useMemo(() => dedupeArticlesById(myArticles), [myArticles]);
   const uniquePendingArticles = useMemo(() => dedupeArticlesById(pendingArticles), [pendingArticles]);
   const filteredArticles = uniqueMyArticles.filter((article) => {
+    if (!article) return false;
     const matchesStatus = articleStatusFilter === "all" || article.status === articleStatusFilter;
-    const matchesSearch = !myArticlesSearch.trim() || 
-      article.title.toLowerCase().includes(myArticlesSearch.toLowerCase()) || 
+    const matchesSearch = !(myArticlesSearch || "").trim() || 
+      (article.title || "").toLowerCase().includes(myArticlesSearch.toLowerCase()) || 
       (article.excerpt || "").toLowerCase().includes(myArticlesSearch.toLowerCase()) ||
       (article.district || "").toLowerCase().includes(myArticlesSearch.toLowerCase()) ||
       (article.area || "").toLowerCase().includes(myArticlesSearch.toLowerCase());
@@ -470,41 +803,46 @@ export const DashboardPage = () => {
   });
   const pagedArticles = filteredArticles.slice((articlePage - 1) * myArticlesPageSize, articlePage * myArticlesPageSize);
   const totalArticlePages = Math.max(1, Math.ceil(filteredArticles.length / myArticlesPageSize));
-  const visiblePendingUsers = pendingUsers.filter((pendingUser) =>
-    [pendingUser.fullName, pendingUser.phone, pendingUser.district, pendingUser.area]
+  const visiblePendingUsers = (pendingUsers || []).filter((pendingUser) =>
+    pendingUser && [pendingUser.fullName, pendingUser.phone, pendingUser.district, pendingUser.area]
       .filter(Boolean)
+      .map(val => String(val))
       .join(" ")
       .toLowerCase()
-      .includes(pendingUserSearch.toLowerCase())
+      .includes((pendingUserSearch || "").toLowerCase())
   );
-  const visibleManagedUsers = managedUsers.filter((managedUser) =>
-    (managedUserStatusFilter === "all" || managedUser.approvalStatus === managedUserStatusFilter) &&
+  const visibleManagedUsers = (managedUsers || []).filter((managedUser) =>
+    managedUser && (managedUserStatusFilter === "all" || managedUser.approvalStatus === managedUserStatusFilter) &&
     [managedUser.fullName, managedUser.phone, managedUser.email, managedUser.role, managedUser.district, managedUser.area, managedUser.approvalStatus]
       .filter(Boolean)
+      .map(val => String(val))
       .join(" ")
       .toLowerCase()
-      .includes(managedUserSearch.toLowerCase())
+      .includes((managedUserSearch || "").toLowerCase())
   );
   const visiblePendingArticles = uniquePendingArticles.filter((article) =>
-    [article.title, article.district, article.area, article.author?.fullName]
+    article && [article.title, article.district, article.area, article.author?.fullName]
       .filter(Boolean)
+      .map(val => String(val))
       .join(" ")
       .toLowerCase()
-      .includes(pendingArticleSearch.toLowerCase())
+      .includes((pendingArticleSearch || "").toLowerCase())
   );
   const totalPendingArticlePages = Math.ceil(visiblePendingArticles.length / pendingArticlePageSize) || 1;
   const pagedPendingArticles = useMemo(() => {
     const startIndex = (pendingArticlePage - 1) * pendingArticlePageSize;
     return visiblePendingArticles.slice(startIndex, startIndex + pendingArticlePageSize);
   }, [visiblePendingArticles, pendingArticlePage, pendingArticlePageSize]);
-  const visibleContactMessages = contactMessages.filter((message) => {
+  const visibleContactMessages = (contactMessages || []).filter((message) => {
+    if (!message) return false;
     const matchesSubTab = inboxSubTab === "journalist" ? Boolean(message.userId) : !message.userId;
     const matchesStatus = contactStatusFilter === "all" || message.status === contactStatusFilter;
     const matchesSearch = [message.fullName, message.email, message.phone, message.subject, message.message, message.status]
       .filter(Boolean)
+      .map(val => String(val))
       .join(" ")
       .toLowerCase()
-      .includes(contactSearch.toLowerCase());
+      .includes((contactSearch || "").toLowerCase());
 
     return matchesSubTab && matchesStatus && matchesSearch;
   });
@@ -533,6 +871,84 @@ export const DashboardPage = () => {
     } finally {
       setBusyAction("");
     }
+  };
+
+  const handleActionWithProgress = async (action, successMessage, progressTitle = "Processing", progressMessage = "Please wait while we complete this action.", progressLabel = "Accredited Action Progress") => {
+    setBusyAction(successMessage);
+    
+    // Set initial loading state with progress = 0
+    setActionPopup({
+      type: "loading",
+      title: progressTitle,
+      message: progressMessage,
+      progress: 0,
+      progressLabel,
+      persistent: true,
+    });
+
+    let progressVal = 0;
+    const interval = setInterval(() => {
+      progressVal += Math.random() * 12 + 3;
+      if (progressVal >= 90) {
+        progressVal = 90;
+        clearInterval(interval);
+      }
+      setActionPopup((prev) => prev ? { ...prev, progress: Math.min(progressVal, 90) } : null);
+    }, 180);
+
+    try {
+      await action();
+      clearInterval(interval);
+      
+      // Flash 100% complete
+      setActionPopup({
+        type: "loading",
+        title: progressTitle,
+        message: "Action completed successfully!",
+        progress: 100,
+        progressLabel: "Action Complete",
+        persistent: true,
+      });
+
+      await new Promise((r) => setTimeout(r, 450));
+
+      setActionPopup({
+        type: "success",
+        title: "Action completed",
+        message: successMessage,
+      });
+    } catch (error) {
+      clearInterval(interval);
+      setActionPopup({
+        type: "error",
+        title: "Action failed",
+        message: error.response?.data?.message || "Action failed",
+      });
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  const triggerPdfDownload = async (url, filename, documentLabel) => {
+    await handleActionWithProgress(async () => {
+      // Fetch the PDF file as a blob
+      const response = await http.get(url, { responseType: "blob" });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      
+      // Create a temporary link to download the blob
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(link.href);
+    }, 
+    `${documentLabel} downloaded successfully.`, 
+    "Generating Document",
+    `Compiling registered office details, loading live verification QR codes, and rendering high-fidelity signatory credentials for ${documentLabel}...`,
+    "PDF Rendering & Compiling"
+    );
   };
 
   const openArticleFromDashboard = (article) => {
@@ -649,7 +1065,9 @@ export const DashboardPage = () => {
         "homepage-hero": 0,
         "homepage-latest": 0,
         "homepage-district": 0,
+        "homepage-popup": 0,
         "in-article": 0,
+        "promotional-article": 0,
         "other": 0
       };
       ads.forEach((ad) => {
@@ -663,7 +1081,9 @@ export const DashboardPage = () => {
         { label: "Homepage Hero", value: placementCounts["homepage-hero"], color: "#f97316" },
         { label: "Homepage Latest", value: placementCounts["homepage-latest"], color: "#3b82f6" },
         { label: "Homepage District", value: placementCounts["homepage-district"], color: "#a855f7" },
+        { label: "Homepage Popup", value: placementCounts["homepage-popup"], color: "#e11d48" },
         { label: "In-Article Injections", value: placementCounts["in-article"], color: "#10b981" },
+        { label: "Promotional Articles", value: placementCounts["promotional-article"], color: "#ec4899" },
         { label: "Other Slots", value: placementCounts.other, color: "#64748b" }
       ];
 
@@ -672,7 +1092,9 @@ export const DashboardPage = () => {
         "homepage-hero": 0,
         "homepage-latest": 0,
         "homepage-district": 0,
+        "homepage-popup": 0,
         "in-article": 0,
+        "promotional-article": 0,
         "other": 0
       };
       ads.forEach((ad) => {
@@ -687,7 +1109,9 @@ export const DashboardPage = () => {
         { label: "Homepage Hero", value: placementClicks["homepage-hero"], color: "#f97316" },
         { label: "Homepage Latest", value: placementClicks["homepage-latest"], color: "#3b82f6" },
         { label: "Homepage District", value: placementClicks["homepage-district"], color: "#a855f7" },
+        { label: "Homepage Popup", value: placementClicks["homepage-popup"], color: "#e11d48" },
         { label: "In-Article Injections", value: placementClicks["in-article"], color: "#10b981" },
+        { label: "Promotional Articles", value: placementClicks["promotional-article"], color: "#ec4899" },
         { label: "Other Slots", value: placementClicks.other, color: "#64748b" }
       ];
 
@@ -1210,6 +1634,14 @@ export const DashboardPage = () => {
         setGlobalIdCardExpiry(cached.globalIdCardExpiry);
         setGlobalExpiryForm(cached.globalIdCardExpiry || "");
       }
+      if (cached.popupDisplayMode !== undefined) setPopupDisplayMode(cached.popupDisplayMode);
+      if (cached.popupLockedAdId !== undefined) setPopupLockedAdId(cached.popupLockedAdId);
+      if (cached["adPricing_homepage-hero"] !== undefined) setAdPricingHero(cached["adPricing_homepage-hero"]);
+      if (cached["adPricing_homepage-latest"] !== undefined) setAdPricingLatest(cached["adPricing_homepage-latest"]);
+      if (cached["adPricing_homepage-district"] !== undefined) setAdPricingDistrict(cached["adPricing_homepage-district"]);
+      if (cached["adPricing_homepage-popup"] !== undefined) setAdPricingPopup(cached["adPricing_homepage-popup"]);
+      if (cached["adPricing_in-article"] !== undefined) setAdPricingInArticle(cached["adPricing_in-article"]);
+      if (cached["adPricing_promotional-article"] !== undefined) setAdPricingPromotional(cached["adPricing_promotional-article"]);
       setIsInitialLoad(false);
     }
 
@@ -1241,6 +1673,14 @@ export const DashboardPage = () => {
         setGlobalIdCardExpiry(data.globalIdCardExpiry);
         setGlobalExpiryForm(data.globalIdCardExpiry || "");
       }
+      if (data.popupDisplayMode !== undefined) setPopupDisplayMode(data.popupDisplayMode);
+      if (data.popupLockedAdId !== undefined) setPopupLockedAdId(data.popupLockedAdId);
+      if (data["adPricing_homepage-hero"] !== undefined) setAdPricingHero(data["adPricing_homepage-hero"]);
+      if (data["adPricing_homepage-latest"] !== undefined) setAdPricingLatest(data["adPricing_homepage-latest"]);
+      if (data["adPricing_homepage-district"] !== undefined) setAdPricingDistrict(data["adPricing_homepage-district"]);
+      if (data["adPricing_homepage-popup"] !== undefined) setAdPricingPopup(data["adPricing_homepage-popup"]);
+      if (data["adPricing_in-article"] !== undefined) setAdPricingInArticle(data["adPricing_in-article"]);
+      if (data["adPricing_promotional-article"] !== undefined) setAdPricingPromotional(data["adPricing_promotional-article"]);
       setIsInitialLoad(false);
     } catch (err) {
       console.error("Failed to load dashboard payload:", err);
@@ -1302,9 +1742,12 @@ export const DashboardPage = () => {
     setManagedUsers((current) =>
       current.map((managedUser) => (managedUser._id === updatedUser._id ? updatedUser : managedUser))
     );
-    setPendingUsers((current) =>
-      current.map((pendingUser) => (pendingUser._id === updatedUser._id ? updatedUser : pendingUser))
-    );
+    setPendingUsers((current) => {
+      if (updatedUser.approvalStatus !== "pending") {
+        return current.filter((pendingUser) => pendingUser._id !== updatedUser._id);
+      }
+      return current.map((pendingUser) => (pendingUser._id === updatedUser._id ? updatedUser : pendingUser));
+    });
     setProfile((current) => (current?._id === updatedUser._id ? updatedUser : current));
   };
 
@@ -1325,9 +1768,49 @@ export const DashboardPage = () => {
   }, [user]);
 
   useEffect(() => {
+    const dailyRate = (() => {
+      switch (adForm.placement) {
+        case "homepage-hero": return Number(adPricingHero);
+        case "homepage-latest": return Number(adPricingLatest);
+        case "homepage-district": return Number(adPricingDistrict);
+        case "homepage-popup": return Number(adPricingPopup);
+        case "in-article": return Number(adPricingInArticle);
+        case "promotional-article": return Number(adPricingPromotional);
+        default: return 0;
+      }
+    })();
+    const duration = Number(adForm.durationDays || 0);
+    setAdForm((prev) => ({
+      ...prev,
+      amount: dailyRate * duration
+    }));
+  }, [
+    adForm.placement,
+    adForm.durationDays,
+    adPricingHero,
+    adPricingLatest,
+    adPricingDistrict,
+    adPricingPopup,
+    adPricingInArticle,
+    adPricingPromotional
+  ]);
+
+  useEffect(() => {
+    const dailyRate = Number(adPricingInArticle || 0);
+    const duration = Number(inArticleAdForm.durationDays || 0);
+    setInArticleAdForm((prev) => ({
+      ...prev,
+      amount: dailyRate * duration
+    }));
+  }, [inArticleAdForm.durationDays, adPricingInArticle]);
+
+  useEffect(() => {
     localStorage.setItem("dashboard_active_tab", activeTab);
     if (activeTab !== "write_news" && activeTab !== "credentials") {
       localStorage.setItem("dashboard_prev_active_tab", activeTab);
+    }
+    if (activeTab === "credentials") {
+      resetCredentialForm();
     }
   }, [activeTab]);
 
@@ -1396,6 +1879,23 @@ export const DashboardPage = () => {
               ...ad,
               viewsCount: payload.viewsCount,
               clicksCount: payload.clicksCount,
+            };
+          }
+          return ad;
+        });
+      });
+    });
+
+    socket.on("ad:status-update", (payload) => {
+      setAds((currentAds) => {
+        if (!currentAds) return [];
+        return currentAds.map((ad) => {
+          if (ad._id === payload.adId) {
+            return {
+              ...ad,
+              status: payload.status,
+              startsAt: payload.startsAt,
+              endsAt: payload.endsAt,
             };
           }
           return ad;
@@ -1590,6 +2090,11 @@ export const DashboardPage = () => {
     setArticleForm(initialArticleForm);
     setEditingArticleId("");
     setArticleErrors({});
+    setStagedAudioUrl("");
+    setStagedAudioDuration(0);
+    setStagedAudioWaveform([]);
+    setStagedAudioName("");
+    setRecordingWaveform([]);
   };
 
   const resetAdForm = () => {
@@ -1609,7 +2114,7 @@ export const DashboardPage = () => {
     setEditingContactId("");
   };
 
-  const resetCredentialForm = () => {
+  function resetCredentialForm() {
     setCredentialForm({
       fullName: profile?.fullName || "",
       email: profile?.email || "",
@@ -1617,11 +2122,19 @@ export const DashboardPage = () => {
       currentPassword: "",
       newPassword: "",
       confirmNewPassword: "",
+      district: profile?.district || "",
+      area: profile?.area || "",
+      aadhaarNumber: profile?.aadhaarNumber || "",
+      bloodGroup: profile?.bloodGroup || "O+",
+      education: profile?.education || "",
+      profilePhotoUrl: profile?.profilePhotoUrl || "",
+      aadhaarImageUrl: profile?.aadhaarImageUrl || "",
+      livePhotoUrl: profile?.livePhotoUrl || "",
     });
     setShowCurrentPassword(false);
     setShowNewPassword(false);
     setShowConfirmPassword(false);
-  };
+  }
 
   const openCredentialForm = () => {
     setActiveTab("credentials");
@@ -1688,7 +2201,7 @@ export const DashboardPage = () => {
     }
 
     setArticleErrors({});
-    await handleAction(async () => {
+    await handleActionWithProgress(async () => {
       if (editingArticleId) {
         await http.patch(`/articles/${editingArticleId}`, articleForm);
       } else {
@@ -1717,7 +2230,13 @@ export const DashboardPage = () => {
         ? "News published to homepage."
         : user?.role === "super_admin"
           ? "News published to homepage."
-          : "News submitted for editorial review.");
+          : "News submitted for editorial review.",
+    editingArticleId ? "Updating News Article" : "Publishing News Article",
+    editingArticleId
+      ? "Saving editorial updates, rebuilding dynamic cache parameters, and pushing live sync blocks to the Palamu Express content feed..."
+      : "Uploading media assets, indexing news block meta tags, generating AI summary pipelines, and pushing live news to the Palamu Express content feed...",
+    "Editorial Publishing Pipeline"
+    );
   };
 
   const handleVoiceNewsSubmitted = () => {
@@ -1821,6 +2340,17 @@ export const DashboardPage = () => {
     }, "Published article deleted.");
   };
 
+  const pauseAllActiveAds = async () => {
+    await handleAction(async () => {
+      await http.patch("/ads/pause-all");
+      await refreshAdminData();
+    }, "All running advertisements paused.");
+  };
+
+  const toggleAdPause = (ad) => {
+    setPendingAdPause(ad);
+  };
+
   const submitAd = async (event) => {
     if (event && event.preventDefault) event.preventDefault();
     await handleAction(async () => {
@@ -1885,6 +2415,12 @@ export const DashboardPage = () => {
       ctaLabel: ad.ctaLabel || "Visit Sponsor",
       notes: ad.notes || "",
       status: ad.status || "active",
+      promotionalContent: ad.promotionalContent || "",
+      district: ad.district || "Palamu",
+      block: ad.block || "Medininagar",
+      targetDistricts: ad.targetDistricts || [],
+      targetBlocks: ad.targetBlocks || [],
+      timeTargeting: ad.timeTargeting || { startHour: 0, endHour: 24 },
     });
   };
 
@@ -1918,8 +2454,8 @@ export const DashboardPage = () => {
       const payload = {
         ...inArticleAdForm,
         placement: "in-article",
-        articleId: selectedAdArticle?._id || "",
-        amount: 0,
+        articleId: inArticleAdForm.articleId || selectedAdArticle?._id || "",
+        amount: Number(inArticleAdForm.amount || 0),
         advertiserName: "Super Admin",
         advertiserEmail: user?.email || "admin@palamuexpress.in",
         advertiserPhone: user?.phone || "0000000000",
@@ -1948,6 +2484,18 @@ export const DashboardPage = () => {
       }
       refreshAdminData();
     }, "In-article ad campaign deleted successfully.");
+  };
+
+  const togglePauseInArticleAd = async (ad) => {
+    const nextStatus = ad.status === "active" ? "paused" : "active";
+    await handleAction(async () => {
+      await http.patch(`/ads/${ad._id}`, {
+        ...ad,
+        status: nextStatus,
+        activateNow: false
+      });
+      refreshAdminData();
+    }, `In-article ad campaign ${nextStatus === "paused" ? "paused" : "resumed"} successfully.`);
   };
 
   const approveAd = async (adId) => {
@@ -2151,6 +2699,54 @@ export const DashboardPage = () => {
     }, "Global ID card expiry date updated successfully.");
   };
 
+  const saveCustomPricing = async (event) => {
+    if (event && event.preventDefault) event.preventDefault();
+    await handleAction(async () => {
+      await http.patch("/admin/settings", {
+        "adPricing_homepage-hero": Number(adPricingHero),
+        "adPricing_homepage-latest": Number(adPricingLatest),
+        "adPricing_homepage-district": Number(adPricingDistrict),
+        "adPricing_homepage-popup": Number(adPricingPopup),
+        "adPricing_in-article": Number(adPricingInArticle),
+        "adPricing_promotional-article": Number(adPricingPromotional),
+      });
+      
+      // Update cache
+      if (dashboardCache) {
+        dashboardCache["adPricing_homepage-hero"] = Number(adPricingHero);
+        dashboardCache["adPricing_homepage-latest"] = Number(adPricingLatest);
+        dashboardCache["adPricing_homepage-district"] = Number(adPricingDistrict);
+        dashboardCache["adPricing_homepage-popup"] = Number(adPricingPopup);
+        dashboardCache["adPricing_in-article"] = Number(adPricingInArticle);
+        dashboardCache["adPricing_promotional-article"] = Number(adPricingPromotional);
+      }
+      
+      await refreshAdminData();
+    }, "Ad package pricing rates updated successfully.");
+  };
+
+  const savePopupSettings = async (mode, lockedId) => {
+    await handleAction(async () => {
+      const payload = {
+        popupDisplayMode: mode !== undefined ? mode : popupDisplayMode,
+        popupLockedAdId: lockedId !== undefined ? lockedId : popupLockedAdId,
+      };
+      
+      const { data } = await http.patch("/admin/settings", payload);
+      
+      if (data.popupDisplayMode !== undefined) {
+        setPopupDisplayMode(data.popupDisplayMode);
+        if (dashboardCache) dashboardCache.popupDisplayMode = data.popupDisplayMode;
+      }
+      if (data.popupLockedAdId !== undefined) {
+        setPopupLockedAdId(data.popupLockedAdId);
+        if (dashboardCache) dashboardCache.popupLockedAdId = data.popupLockedAdId;
+      }
+      
+      await refreshAdminData();
+    }, "Pop-up interstitial settings updated successfully.");
+  };
+
   const clearGlobalExpiry = () => {
     setShowClearExpiryConfirm(true);
   };
@@ -2272,6 +2868,14 @@ export const DashboardPage = () => {
         currentPassword: "",
         newPassword: "",
         confirmNewPassword: "",
+        district: data.user.district || "",
+        area: data.user.area || "",
+        aadhaarNumber: data.user.aadhaarNumber || "",
+        bloodGroup: data.user.bloodGroup || "O+",
+        education: data.user.education || "",
+        profilePhotoUrl: data.user.profilePhotoUrl || "",
+        aadhaarImageUrl: data.user.aadhaarImageUrl || "",
+        livePhotoUrl: data.user.livePhotoUrl || "",
       });
       setShowCurrentPassword(false);
       setShowNewPassword(false);
@@ -2399,12 +3003,66 @@ export const DashboardPage = () => {
       return;
     }
 
+    const isRepOrEditor = user?.role === "reporter" || user?.role === "chief_editor";
+
+    if (isRepOrEditor) {
+      if (!String(credentialForm.district || "").trim()) {
+        setActionPopup({
+          type: "error",
+          title: "District required",
+          message: "Please select your jurisdiction district.",
+        });
+        return;
+      }
+      if (!String(credentialForm.area || "").trim()) {
+        setActionPopup({
+          type: "error",
+          title: "Block / Area required",
+          message: "Please select your Block / Area jurisdiction.",
+        });
+        return;
+      }
+      const aadhaarDigits = String(credentialForm.aadhaarNumber || "").replace(/\D/g, "");
+      if (aadhaarDigits.length !== 12) {
+        setActionPopup({
+          type: "error",
+          title: "Invalid Aadhaar number",
+          message: "The Aadhaar number entered must be exactly 12 digits.",
+        });
+        return;
+      }
+      if (!String(credentialForm.profilePhotoUrl || "").trim()) {
+        setActionPopup({
+          type: "error",
+          title: "Profile photo required",
+          message: "Please upload your formal profile photo.",
+        });
+        return;
+      }
+      if (!String(credentialForm.aadhaarImageUrl || "").trim()) {
+        setActionPopup({
+          type: "error",
+          title: "Aadhaar Scan required",
+          message: "Please upload a clear scan of your Aadhaar card.",
+        });
+        return;
+      }
+    }
+
     const payload = {
       fullName: String(credentialForm.fullName || "").trim(),
       email: String(credentialForm.email || "").trim(),
       phone: String(credentialForm.phone || "").trim(),
       currentPassword: credentialForm.currentPassword,
       newPassword: credentialForm.newPassword,
+      district: credentialForm.district,
+      area: credentialForm.area,
+      aadhaarNumber: credentialForm.aadhaarNumber,
+      bloodGroup: credentialForm.bloodGroup,
+      education: credentialForm.education,
+      profilePhotoUrl: credentialForm.profilePhotoUrl,
+      aadhaarImageUrl: credentialForm.aadhaarImageUrl,
+      livePhotoUrl: credentialForm.livePhotoUrl,
     };
 
     const isSensitiveChanged = 
@@ -2493,14 +3151,24 @@ export const DashboardPage = () => {
       }
       setShowNotificationsDropdown(false);
 
+      const isSuperAdmin = user?.role === "super_admin";
+
       if (notif.articleId) {
         setActiveTab("queue");
         setExpandedArticleId(notif.articleId);
         setPendingArticleSearch("");
         setPendingArticlePage(1);
       } else if (notif.onboardingUserId) {
-        setActiveTab("approvals");
-        setPendingUserSearch("");
+        if (isSuperAdmin) {
+          setActiveTab("approvals");
+          setPendingUserSearch("");
+        } else {
+          if (profile?.approvalStatus === "approved") {
+            setActiveTab("press_credentials");
+          } else {
+            setActiveTab("credentials");
+          }
+        }
       } else if (
         String(notif.title || "").toLowerCase().includes("article") || 
         String(notif.title || "").toLowerCase().includes("news") || 
@@ -2512,10 +3180,21 @@ export const DashboardPage = () => {
       } else if (
         String(notif.title || "").toLowerCase().includes("onboarding") || 
         String(notif.title || "").toLowerCase().includes("kyc") || 
-        String(notif.message || "").toLowerCase().includes("onboarding approval")
+        String(notif.message || "").toLowerCase().includes("onboarding approval") ||
+        String(notif.title || "").toLowerCase().includes("rejected") ||
+        String(notif.message || "").toLowerCase().includes("rejected") ||
+        String(notif.message || "").toLowerCase().includes("rejection")
       ) {
-        setActiveTab("approvals");
-        setPendingUserSearch("");
+        if (isSuperAdmin) {
+          setActiveTab("approvals");
+          setPendingUserSearch("");
+        } else {
+          if (profile?.approvalStatus === "approved") {
+            setActiveTab("press_credentials");
+          } else {
+            setActiveTab("credentials");
+          }
+        }
       }
     } catch (err) {
       console.error("Failed handling notification click redirection:", err);
@@ -2890,12 +3569,15 @@ export const DashboardPage = () => {
   const renderOverview = () => {
     return (
       <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-orange-400">Workspace Overview</p>
-          <h1 className="mt-2 font-display text-3xl font-bold text-white md:text-4xl">
-            Welcome back, {profile?.fullName || user?.fullName || "Journalist"}
-          </h1>
-          <p className="mt-2 text-sm text-slate-400">Here is your customized editorial briefing, metrics, and verification records.</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 border-b border-white/5 pb-6">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-orange-400">Workspace Overview</p>
+            <h1 className="font-display text-3xl font-bold text-white md:text-4xl">
+              Welcome back, {profile?.fullName || user?.fullName || "Journalist"}
+            </h1>
+            <p className="text-sm text-slate-400">Here is your customized editorial briefing, metrics, and verification records.</p>
+          </div>
+
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -2904,7 +3586,7 @@ export const DashboardPage = () => {
           ))}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 max-w-5xl">
           {/* Profile Details Card */}
           <div className="panel p-6 border border-white/5 bg-slate-900/10">
             <h3 className="text-lg font-bold text-white border-b border-white/5 pb-3 flex items-center gap-2">
@@ -2967,18 +3649,110 @@ export const DashboardPage = () => {
                 <>
                   <p>Your reporter desk opens after approval, email verification, and active newsroom access. Super admin can temporarily disable these actions when needed.</p>
                   <p>Use the excerpt field for a concise summary and the full content field for the complete report copy.</p>
-                  <p>Approved reporters also receive a generated reporter ID card link directly inside this dashboard.</p>
                 </>
               )}
             </div>
           </div>
+        </div>
+      </div>
+    );
+  };
 
-          {/* ID Card Preview Block */}
-          {showReporterCardAction && (
-            <div className="lg:col-span-1">
-              <IDCardPreview profile={profile} cardUrl={reporterCardUrl} globalIdCardExpiry={globalIdCardExpiry} />
+  const renderPressCredentials = () => {
+    if (!profile) return null;
+
+    if (profile.approvalStatus !== "approved") {
+      return (
+        <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
+          <div className="border-b border-white/5 pb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Accredited Credentials</p>
+            <h2 className="text-2xl font-bold text-white mt-1">Press Documents</h2>
+            <p className="text-xs text-slate-400 mt-1">Access, download, and verify your digital accreditation staff ID card and official appointment documents.</p>
+          </div>
+          
+          <div className="text-center py-16 rounded-3xl border border-dashed border-white/10 bg-slate-900/10 max-w-2xl mx-auto mt-6">
+            <IdCard className="h-12 w-12 text-slate-500 mx-auto mb-4 animate-pulse" />
+            <h3 className="text-lg font-bold text-white">Credentials Generating</h3>
+            <p className="text-slate-400 text-sm mt-2 max-w-md mx-auto leading-relaxed">
+              Your official Press ID Card, Designation Letters, and Police Authorization documentation are automatically compiled as soon as your onboarding profile is approved by the Super Admin.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
+        <div className="border-b border-white/5 pb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Accredited Credentials</p>
+          <h2 className="text-2xl font-bold text-white mt-1">Press Documents</h2>
+          <p className="text-xs text-slate-400 mt-1">Access, download, and verify your digital accreditation staff ID card and official appointment documents.</p>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3 items-start">
+          {/* Left Column: ID Card Preview (Spans 1 col on lg, takes auto height) */}
+          <div className="lg:col-span-1">
+            <IDCardPreview profile={profile} cardUrl={reporterCardUrl} globalIdCardExpiry={globalIdCardExpiry} />
+          </div>
+
+          {/* Right Column: Letters (Spans 2 cols on lg) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="panel p-6 border border-white/5 bg-slate-900/10 flex flex-col justify-between rounded-3xl shadow-xl">
+              <div className="w-full text-center sm:text-left mb-4">
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <FileText className="h-5 w-5 text-orange-500" />
+                  <h2 className="text-xl font-semibold text-white">Official Documentation</h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Designation & Police Facilitation Letters</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-[9px] text-orange-400 font-bold uppercase tracking-wider">Official Appointment Letter</p>
+                    <p className="text-sm font-bold text-white">Press Designation & Contract Terms</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Legal appointment letter certifying your designated reporting status under Palamu Express Digital Media.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => triggerPdfDownload(
+                      `/users/download-appt/${profile._id}`,
+                      `Palamu_Express_Appointment_Letter_${profile.reporterCode || profile.chiefEditorCode || "Staff"}.pdf`,
+                      "Official Appointment Letter"
+                    )}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 w-full text-xs font-bold rounded-xl bg-orange-600 text-white hover:bg-orange-500 transition shadow-md shadow-orange-950/20 cursor-pointer"
+                  >
+                    <Download size={13} />
+                    Download Appointment Letter
+                  </button>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-[9px] text-orange-400 font-bold uppercase tracking-wider">Press Authorization Letter</p>
+                    <p className="text-sm font-bold text-white">Accredited Credentials Authorization</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Formal credentials letter requesting police authorities and administrative bodies to facilitate your regional reporting operations.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => triggerPdfDownload(
+                      `/users/download-auth/${profile._id}`,
+                      `Palamu_Express_Authorization_Letter_${profile.reporterCode || profile.chiefEditorCode || "Staff"}.pdf`,
+                      "Credentials Authorization Letter"
+                    )}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 w-full text-xs font-bold rounded-xl bg-orange-600 text-white hover:bg-orange-500 transition shadow-md shadow-orange-950/20 cursor-pointer"
+                  >
+                    <Download size={13} />
+                    Download Authorization Letter
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     );
@@ -3134,6 +3908,134 @@ export const DashboardPage = () => {
                 if (articleErrors.content) setArticleErrors({ ...articleErrors, content: false });
               }}
             />
+
+            {articleForm.audioUrl && (
+              <div className="md:col-span-2 rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-white">Voice News Audio File</h4>
+                    <p className="text-xs text-slate-400 mt-1">Manage the audio file, re-record, or upload a pre-recorded bulletin.</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                    <Mic size={10} className="text-emerald-400 shrink-0" />
+                    Voice Format
+                  </span>
+                </div>
+
+                {/* Audio Preview Box */}
+                {articleForm.audioUrl && (
+                  <div className="rounded-2xl border border-white/5 bg-slate-950/40 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Current Audio Preview</p>
+                    <audio src={articleForm.audioUrl} controls className="w-full" />
+                  </div>
+                )}
+
+                {/* Actions Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Re-record Option */}
+                  <div className="rounded-xl border border-white/5 bg-slate-900/30 p-4 flex flex-col justify-between space-y-4">
+                    <div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-slate-300">Option A: Re-record Audio</h5>
+                      <p className="text-xs text-slate-500 mt-1">Use your microphone to record a new voice bulletin directly in your browser.</p>
+                    </div>
+
+                    {isRecording ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-xs text-slate-400">
+                          <span className="flex items-center gap-1.5 text-red-400">
+                            <span className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-ping" />
+                            Recording...
+                          </span>
+                          <span>{formatDuration(recordingTime)}</span>
+                        </div>
+                        
+                        {/* Real-time mic wave meter visualization */}
+                        <div className="rounded-xl border border-red-500/15 bg-red-950/15 p-2">
+                          <AudioWaveform waveform={recordingWaveform} active={isRecording} compact className="h-10 border-0 bg-transparent py-0 px-0" />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={stopRecordingAudio}
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold py-2 px-3 text-xs transition animate-[pulse_2s_infinite]"
+                        >
+                          <Square size={12} />
+                          Stop Recording
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={startRecordingAudio}
+                        className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 font-semibold py-2.5 px-3 text-xs transition w-full"
+                      >
+                        <Mic size={12} />
+                        Start Re-recording
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Upload Pre-recorded Option */}
+                  <div className="rounded-xl border border-white/5 bg-slate-900/30 p-4 flex flex-col justify-between space-y-4">
+                    <div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-slate-300">Option B: Upload Audio File</h5>
+                      <p className="text-xs text-slate-500 mt-1">Upload a pre-recorded audio file (.mp3, .wav, .m4a, or .webm format).</p>
+                    </div>
+                    <div>
+                      <label className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:border-orange-500/30 hover:bg-orange-500/10 hover:text-orange-400 font-semibold py-2.5 px-3 text-xs cursor-pointer transition w-full">
+                        <Upload size={12} />
+                        Choose Audio File
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={handleAudioFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Staged Preview Console (Previewing recorded/uploaded audio before replacing) */}
+                {stagedAudioUrl && (
+                  <div className="rounded-2xl border border-orange-500/25 bg-orange-500/[0.03] p-4 space-y-3 animate-[fadeIn_0.3s_ease-out] shadow-md mt-4">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400">Audio Preview Staged</span>
+                        <h5 className="text-xs font-semibold text-white mt-0.5 truncate max-w-[280px]" title={stagedAudioName}>
+                          Previewing: {stagedAudioName}
+                        </h5>
+                      </div>
+                      <span className="rounded-full bg-orange-500/10 px-2.5 py-0.5 text-[9px] uppercase tracking-wider text-orange-400 font-bold border border-orange-500/20">
+                        Not Applied Yet
+                      </span>
+                    </div>
+
+                    <audio src={stagedAudioUrl} controls className="w-full" />
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                      <button
+                        type="button"
+                        onClick={discardStagedAudio}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-red-500/25 hover:bg-red-500/10 hover:text-red-400 transition"
+                      >
+                        <Trash2 size={12} />
+                        Discard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyStagedAudio}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white hover:bg-orange-400 hover:shadow-[0_0_15px_rgba(249,115,22,0.25)] transition"
+                      >
+                        <Check size={12} />
+                        Apply & Replace Old Audio
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="md:col-span-2">
               <div className={`rounded-2xl p-0.5 transition-all duration-300 ${
                 articleErrors.coverImageUrl
@@ -3235,7 +4137,7 @@ export const DashboardPage = () => {
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Category</th>
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Publish Date</th>
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Views</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Feedback & Audio</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Format</th>
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 text-center">Actions</th>
                   </tr>
                 </thead>
@@ -3301,6 +4203,11 @@ export const DashboardPage = () => {
                                   {[article.district, article.area].filter(Boolean).join(" • ") || "-"}
                                 </span>
                               </div>
+                              {article.editorFeedback && (
+                                <div className="mt-1.5 text-[11px] text-rose-300 font-medium bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg inline-block max-w-[280px]" title={article.editorFeedback}>
+                                  <span className="font-semibold text-rose-400">Feedback:</span> {article.editorFeedback}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -3340,15 +4247,17 @@ export const DashboardPage = () => {
                         </td>
 
                         {/* Column 6: Feedback / Audio story preview */}
-                        <td className="px-6 py-4 max-w-[200px]">
-                          {article.editorFeedback ? (
-                            <div className="rounded-xl border border-rose-500/15 bg-rose-500/[0.02] p-2 text-[11px] text-rose-300 line-clamp-2" title={article.editorFeedback}>
-                              <span className="font-semibold text-rose-400">Feedback:</span> {article.editorFeedback}
-                            </div>
-                          ) : article.audioUrl ? (
-                            <AudioStoryPlayer article={article} compact className="max-w-[150px]" />
+                        <td className="px-6 py-4">
+                          {article.audioUrl ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                              <Mic size={12} className="text-emerald-400 shrink-0 animate-pulse" />
+                              Voice News
+                            </span>
                           ) : (
-                            <span className="text-xs text-slate-500 italic">No feedback or audio</span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                              <FileText size={12} className="text-blue-400 shrink-0" />
+                              Text Article
+                            </span>
                           )}
                         </td>
 
@@ -3486,26 +4395,80 @@ export const DashboardPage = () => {
         <div className="border-b border-white/5 pb-4">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Onboarding Verification Queue</p>
           <h2 className="text-2xl font-bold text-white mt-1">Reporter Approvals</h2>
+          <p className="text-xs text-slate-400 mt-1">Review onboarding applications, verify Aadhaar KYC scans, and authorize digital press card credentials.</p>
         </div>
-        <input className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Search pending reporters" value={pendingUserSearch} onChange={(event) => setPendingUserSearch(event.target.value)} />
-        <div className="mt-5 space-y-4">
+
+        <input 
+          className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition" 
+          placeholder="Search pending reporters by name, phone, district..." 
+          value={pendingUserSearch} 
+          onChange={(event) => setPendingUserSearch(event.target.value)} 
+        />
+
+        <div className="mt-6 space-y-3">
           {visiblePendingUsers.map((pendingUser) => (
-            <div key={pendingUser._id} className="rounded-2xl border border-white/10 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="text-lg font-semibold text-white">{pendingUser.fullName}</p>
-                  <p className="text-sm text-slate-500">{joinMetaParts(pendingUser.phone, pendingUser.district, pendingUser.area)}</p>
+            <div 
+              key={pendingUser._id} 
+              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/20 px-5 py-4 transition hover:border-white/20 hover:bg-slate-900/40 flex flex-col md:flex-row md:items-center justify-between gap-4"
+            >
+              {/* Left section: Profile & Name & Role */}
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="h-11 w-11 rounded-xl overflow-hidden bg-slate-955 border border-white/10 flex items-center justify-center shrink-0">
+                  {pendingUser.profilePhotoUrl || pendingUser.livePhotoUrl ? (
+                    <img src={pendingUser.profilePhotoUrl || pendingUser.livePhotoUrl} alt={pendingUser.fullName} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-slate-400">
+                      {pendingUser.fullName ? pendingUser.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "PE"}
+                    </span>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => approveUser(pendingUser._id)} className="rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 transition">Approve</button>
-                  <button type="button" onClick={() => rejectUser(pendingUser._id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">Reject</button>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-bold text-white text-sm truncate" title={pendingUser.fullName}>{pendingUser.fullName}</p>
+                    <span className="inline-block rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider shrink-0">
+                      {String(pendingUser.role || "reporter").replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1 font-mono">{pendingUser.email || "No email provided"}</p>
                 </div>
               </div>
-              <input className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none" placeholder="Optional rejection feedback" value={feedbacks[`user-${pendingUser._id}`] || ""} onChange={(event) => setFeedbacks({ ...feedbacks, [`user-${pendingUser._id}`]: event.target.value })} />
+
+              {/* Middle section: Compact Meta Details */}
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 uppercase tracking-wider text-[8px] font-bold">Phone:</span>
+                  <span className="font-mono font-semibold text-slate-200">{pendingUser.phone}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 uppercase tracking-wider text-[8px] font-bold">District:</span>
+                  <span className="font-semibold text-slate-200">{pendingUser.district || "-"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 uppercase tracking-wider text-[8px] font-bold">Area:</span>
+                  <span className="font-semibold text-slate-200 truncate max-w-[150px]">{pendingUser.area || "-"}</span>
+                </div>
+              </div>
+
+              {/* Right section: Review Action */}
+              <button 
+                type="button" 
+                onClick={() => setSelectedPendingUser(pendingUser)} 
+                className="rounded-xl bg-orange-600 hover:bg-orange-500 transition text-xs font-bold text-white px-5 py-2.5 flex items-center justify-center gap-1.5 shadow-md shadow-orange-950/20 shrink-0 self-stretch md:self-auto"
+              >
+                <span>Review Onboarding</span>
+                <ChevronRight size={12} />
+              </button>
             </div>
           ))}
-          {!visiblePendingUsers.length ? <p className="text-slate-500 py-4 text-center">No reporter approvals match your search.</p> : null}
         </div>
+        
+        {!visiblePendingUsers.length ? (
+          <div className="text-center py-12 rounded-2xl border border-dashed border-white/10 bg-slate-900/5 mt-6">
+            <ShieldAlert className="h-8 w-8 text-slate-500 mx-auto mb-2" />
+            <p className="text-slate-400 text-sm font-semibold">No reporter approvals waiting</p>
+            <p className="text-slate-500 text-xs mt-1">Pending user registration requests will appear here for review.</p>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -3828,6 +4791,87 @@ export const DashboardPage = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Subsection: Accredited Documents & Letters */}
+                    {selectedManagedUser.approvalStatus === "approved" && (
+                      <div className="border-t border-white/5 pt-4 space-y-4">
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Accredited Documents & Letters</h4>
+                        
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          {/* Press ID Card */}
+                          <button
+                            type="button"
+                            onClick={() => triggerPdfDownload(
+                              `/users/download-card/${selectedManagedUser._id}`,
+                              `Palamu_Express_ID_Card_${selectedManagedUser.reporterCode || selectedManagedUser.chiefEditorCode || "Staff"}.pdf`,
+                              "Digital Press Card"
+                            )}
+                            className="group flex flex-col justify-between text-left w-full rounded-xl border border-white/10 bg-slate-900/40 p-3 hover:border-orange-500/50 hover:bg-orange-500/[0.02] transition cursor-pointer"
+                          >
+                            <div className="flex gap-2.5">
+                              <div className="mt-0.5 flex-shrink-0 h-7 w-7 rounded-lg bg-orange-600/10 border border-orange-500/20 flex items-center justify-center text-orange-400 group-hover:bg-orange-600 group-hover:text-white transition">
+                                <IdCard size={14} />
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider group-hover:text-orange-400 transition">Digital Press Card</p>
+                                <p className="text-[11.5px] font-bold text-white mt-0.5">Official ID Card PDF</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold text-orange-400 mt-3 flex items-center gap-1 group-hover:underline">
+                              Download ID PDF &rarr;
+                            </span>
+                          </button>
+
+                          {/* Appointment Letter */}
+                          <button
+                            type="button"
+                            onClick={() => triggerPdfDownload(
+                              `/users/download-appt/${selectedManagedUser._id}`,
+                              `Palamu_Express_Appointment_Letter_${selectedManagedUser.reporterCode || selectedManagedUser.chiefEditorCode || "Staff"}.pdf`,
+                              "Official Appointment Letter"
+                            )}
+                            className="group flex flex-col justify-between text-left w-full rounded-xl border border-white/10 bg-slate-900/40 p-3 hover:border-orange-500/50 hover:bg-orange-500/[0.02] transition cursor-pointer"
+                          >
+                            <div className="flex gap-2.5">
+                              <div className="mt-0.5 flex-shrink-0 h-7 w-7 rounded-lg bg-orange-600/10 border border-orange-500/20 flex items-center justify-center text-orange-400 group-hover:bg-orange-600 group-hover:text-white transition">
+                                <FileText size={14} />
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider group-hover:text-orange-400 transition">Appointment Letter</p>
+                                <p className="text-[11.5px] font-bold text-white mt-0.5">Official Appointment PDF</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold text-orange-400 mt-3 flex items-center gap-1 group-hover:underline">
+                              Download Appt PDF &rarr;
+                            </span>
+                          </button>
+
+                          {/* Authorization Letter */}
+                          <button
+                            type="button"
+                            onClick={() => triggerPdfDownload(
+                              `/users/download-auth/${selectedManagedUser._id}`,
+                              `Palamu_Express_Authorization_Letter_${selectedManagedUser.reporterCode || selectedManagedUser.chiefEditorCode || "Staff"}.pdf`,
+                              "Credentials Authorization Letter"
+                            )}
+                            className="group flex flex-col justify-between text-left w-full rounded-xl border border-white/10 bg-slate-900/40 p-3 hover:border-orange-500/50 hover:bg-orange-500/[0.02] transition cursor-pointer"
+                          >
+                            <div className="flex gap-2.5">
+                              <div className="mt-0.5 flex-shrink-0 h-7 w-7 rounded-lg bg-orange-600/10 border border-orange-500/20 flex items-center justify-center text-orange-400 group-hover:bg-orange-600 group-hover:text-white transition">
+                                <ShieldCheck size={14} />
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider group-hover:text-orange-400 transition">Authorization Letter</p>
+                                <p className="text-[11.5px] font-bold text-white mt-0.5">Press Credentials PDF</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold text-orange-400 mt-3 flex items-center gap-1 group-hover:underline">
+                              Download Credentials &rarr;
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Bottom Admin Control Actions */}
@@ -3871,15 +4915,14 @@ export const DashboardPage = () => {
                     ) : (
                       <button
                         type="button"
-                        onClick={async () => {
-                          const reason = window.prompt("Optional rejection/ban feedback:", "KYC details require corrections");
-                          if (reason === null) return;
-                          await handleAction(async () => {
-                            const { data } = await http.patch(`/users/${selectedManagedUser._id}/reject`, { feedback: reason });
-                            syncManagedUserState(data.user);
-                            setSelectedManagedUser(data.user);
-                            await refreshAdminData();
-                          }, "User rejected/banned with feedback.");
+                        onClick={() => {
+                          if (!feedbacks[`user-${selectedManagedUser._id}`]) {
+                            setFeedbacks({
+                              ...feedbacks,
+                              [`user-${selectedManagedUser._id}`]: "KYC details require corrections"
+                            });
+                          }
+                          setPendingUserRejectId(selectedManagedUser._id);
                         }}
                         className="w-full sm:w-auto rounded-full bg-slate-900 text-amber-400 border border-amber-500/20 hover:bg-slate-800 hover:border-amber-500/40 px-5 py-2.5 text-xs font-bold text-center justify-center flex items-center transition"
                       >
@@ -4481,19 +5524,49 @@ export const DashboardPage = () => {
             <Activity size={14} className="text-orange-400 animate-pulse" />
             Performance Analytics
           </button>
+          <button
+            onClick={() => setAdDeskSubTab("pricing")}
+            className={`pb-2 text-sm font-semibold border-b-2 whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+              adDeskSubTab === "pricing" ? "border-orange-500 text-orange-400 font-bold" : "border-transparent text-slate-400 hover:text-white"
+            }`}
+          >
+            <Sliders size={14} className="text-orange-400" />
+            Package Pricing
+          </button>
+          <button
+            onClick={() => setAdDeskSubTab("popups")}
+            className={`pb-2 text-sm font-semibold border-b-2 whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+              adDeskSubTab === "popups" ? "border-orange-500 text-orange-400 font-bold" : "border-transparent text-slate-400 hover:text-white"
+            }`}
+          >
+            <Layers size={14} className="text-orange-400" />
+            Pop-up Desk
+          </button>
         </div>
 
         {adDeskSubTab === "all" && (
           /* ALL CAMPAIGNS DIRECTORY */
           <div className="space-y-6">
             {/* Search & Filters */}
-            <div className="grid gap-3 sm:grid-cols-[1fr_200px_180px]">
+            <div className="grid gap-3 sm:grid-cols-[1fr_180px_180px_150px]">
               <input
                 className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none text-sm"
                 placeholder="Search campaigns by brand, title, advertiser..."
                 value={adSearch}
                 onChange={(event) => setAdSearch(event.target.value)}
               />
+              <select
+                className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none text-sm font-semibold text-orange-400"
+                value={adPlacementFilter}
+                onChange={(event) => setAdPlacementFilter(event.target.value)}
+              >
+                <option value="all" className="text-white">All Ad Slots</option>
+                {adPlacements.map((p) => (
+                  <option key={p.value} value={p.value} className="text-white">
+                    {p.label}
+                  </option>
+                ))}
+              </select>
               <select
                 className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white focus:outline-none text-sm"
                 value={adStatusFilter}
@@ -4552,6 +5625,13 @@ export const DashboardPage = () => {
                 >
                   <FileText size={14} /> Export PDF Report
                 </button>
+                 <button
+                  type="button"
+                  onClick={() => setPendingPauseAllAds(true)}
+                  className="rounded-xl bg-rose-600/10 border border-rose-500/20 text-rose-400 hover:bg-rose-600 hover:text-white px-3.5 py-2 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                >
+                  <ShieldAlert size={14} /> Pause All Active Ads
+                </button>
               </div>
             </div>
 
@@ -4559,7 +5639,7 @@ export const DashboardPage = () => {
               /* TABULAR VIEW OF CAMPAIGNS DIRECTORY */
               <div className="panel overflow-hidden border border-white/5 bg-slate-900/10 rounded-3xl">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-xs text-slate-350">
+                  <table className="w-full min-w-[1200px] border-collapse text-left text-xs text-slate-350">
                     <thead className="border-b border-white/5 bg-white/[0.02] text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                       <tr>
                         <th className="px-5 py-3 text-center" style={{ width: "5%" }}>S.No</th>
@@ -4571,6 +5651,7 @@ export const DashboardPage = () => {
                         <th className="px-5 py-3 text-center">Stats (Views / Clicks / CTR)</th>
                         <th className="px-5 py-3 text-center">Status</th>
                         <th className="px-5 py-3 text-center">Actions</th>
+                        <th className="px-5 py-3 text-center" style={{ width: "120px" }}></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -4620,17 +5701,33 @@ export const DashboardPage = () => {
                               <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
                                 ad.status === "active"
                                   ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                                  : ad.status === "expired"
-                                    ? "bg-slate-500/10 text-slate-400 border border-slate-500/10"
-                                    : ad.status === "pending_approval" || ad.status === "pending_payment"
-                                      ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 animate-pulse"
-                                      : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  : ad.status === "paused"
+                                    ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30"
+                                    : ad.status === "expired"
+                                      ? "bg-slate-500/10 text-slate-400 border border-slate-500/10"
+                                      : ad.status === "pending_approval" || ad.status === "pending_payment"
+                                        ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 animate-pulse"
+                                        : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                               }`}>
                                 {String(ad.status).replaceAll("_", " ")}
                               </span>
                             </td>
                             <td className="px-5 py-4 text-center whitespace-nowrap">
                               <div className="flex items-center justify-center gap-2">
+                                {(ad.status === "active" || ad.status === "paused") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleAdPause(ad)}
+                                    className={`rounded-lg p-1.5 transition duration-150 border ${
+                                      ad.status === "active"
+                                        ? "bg-orange-500/10 hover:bg-orange-600 border-orange-500/20 hover:border-transparent text-orange-400 hover:text-white"
+                                        : "bg-emerald-500/10 hover:bg-emerald-600 border-emerald-500/20 hover:border-transparent text-emerald-450 hover:text-white animate-pulse"
+                                    }`}
+                                    title={ad.status === "active" ? "Pause Campaign" : "Resume Campaign"}
+                                  >
+                                    {ad.status === "active" ? <Pause size={13} /> : <Play size={13} />}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => startEditAd(ad)}
@@ -4649,12 +5746,13 @@ export const DashboardPage = () => {
                                 </button>
                               </div>
                             </td>
+                            <td className="px-5 py-4" style={{ width: "120px" }}></td>
                           </tr>
                         );
                       })}
                       {!visibleManagedAds.length && (
                         <tr>
-                          <td colSpan={9} className="px-5 py-12 text-center text-slate-500 italic">
+                          <td colSpan={10} className="px-5 py-12 text-center text-slate-500 italic">
                             No campaigns found matching your criteria.
                           </td>
                         </tr>
@@ -4683,11 +5781,13 @@ export const DashboardPage = () => {
                           <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
                             ad.status === "active"
                               ? "bg-green-500/10 text-green-300 border border-green-500/20"
-                              : ad.status === "expired"
-                                ? "bg-slate-500/10 text-slate-300 border border-slate-500/20"
-                                : ad.status === "pending_approval" || ad.status === "pending_payment"
-                                  ? "bg-yellow-500/10 text-yellow-300 border border-yellow-500/20 animate-pulse"
-                                  : "bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                              : ad.status === "paused"
+                                ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"
+                                : ad.status === "expired"
+                                  ? "bg-slate-500/10 text-slate-300 border border-slate-500/20"
+                                  : ad.status === "pending_approval" || ad.status === "pending_payment"
+                                    ? "bg-yellow-500/10 text-yellow-300 border border-yellow-500/20 animate-pulse"
+                                    : "bg-rose-500/10 text-rose-300 border border-rose-500/20"
                           }`}>
                             {String(ad.status).replaceAll("_", " ")}
                           </span>
@@ -4721,6 +5821,19 @@ export const DashboardPage = () => {
                       >
                         Edit Campaign
                       </button>
+                      {(ad.status === "active" || ad.status === "paused") && (
+                        <button
+                          type="button"
+                          onClick={() => toggleAdPause(ad)}
+                          className={`rounded-full px-4 py-2 text-xs font-bold transition shadow-md hover:scale-[1.03] active:scale-[0.97] border ${
+                            ad.status === "active"
+                              ? "bg-orange-500/10 hover:bg-orange-600 border-orange-500/20 hover:border-transparent text-orange-400 hover:text-white"
+                              : "bg-indigo-500/10 hover:bg-indigo-600 border-indigo-500/20 hover:border-transparent text-indigo-400 hover:text-white animate-pulse"
+                          }`}
+                        >
+                          {ad.status === "active" ? "Pause" : "Resume"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setPendingAdDelete(ad)}
@@ -4789,21 +5902,30 @@ export const DashboardPage = () => {
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-white/5 flex gap-2">
+                  <div className="mt-5 pt-3 border-t border-white/5 flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={() => setPendingAdApproveId(ad._id)}
-                      className="flex-grow rounded-full bg-green-600 hover:bg-green-500 text-white px-4 py-2 text-xs font-bold transition shadow-md hover:scale-[1.03] active:scale-[0.97]"
+                      onClick={() => setInspectingAd(ad)}
+                      className="w-full rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500 hover:text-white px-4 py-2 text-xs font-bold transition shadow-md flex items-center justify-center gap-1.5"
                     >
-                      Approve & Publish
+                      <Eye size={13} /> Inspect & Edit Campaign
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => rejectAd(ad._id)}
-                      className="rounded-full bg-rose-600/10 border border-rose-500/20 text-rose-400 hover:bg-rose-600 hover:text-white px-4 py-2 text-xs font-bold transition shadow-md"
-                    >
-                      Reject
-                    </button>
+                    <div className="flex gap-2 w-full">
+                      <button
+                        type="button"
+                        onClick={() => setPendingAdApproveId(ad._id)}
+                        className="flex-grow rounded-full bg-green-600 hover:bg-green-500 text-white px-4 py-2 text-xs font-bold transition shadow-md hover:scale-[1.03] active:scale-[0.97]"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => rejectAd(ad._id)}
+                        className="flex-grow rounded-full bg-rose-600/10 border border-rose-500/20 text-rose-400 hover:bg-rose-600 hover:text-white px-4 py-2 text-xs font-bold transition shadow-md"
+                      >
+                        Reject
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -5095,6 +6217,7 @@ export const DashboardPage = () => {
                 "homepage-hero": { label: "Homepage Hero", imp: 0, cli: 0 },
                 "homepage-latest": { label: "Homepage Latest", imp: 0, cli: 0 },
                 "homepage-district": { label: "Homepage District", imp: 0, cli: 0 },
+                "homepage-popup": { label: "Homepage Popup Modal", imp: 0, cli: 0 },
                 "in-article": { label: "In-Article Injections", imp: 0, cli: 0 }
               };
 
@@ -5187,19 +6310,19 @@ export const DashboardPage = () => {
                           maintainAspectRatio: false,
                           scales: {
                             y: {
-                              grid: { color: "rgba(255, 255, 255, 0.05)" },
-                              ticks: { color: "rgba(148, 163, 184, 0.7)", font: { size: 10 } }
+                              grid: { color: chartGridColor },
+                              ticks: { color: chartTicksColor, font: { size: 10 } }
                             },
                             x: {
                               grid: { display: false },
-                              ticks: { color: "rgba(148, 163, 184, 0.7)", font: { size: 10 } }
+                              ticks: { color: chartTicksColor, font: { size: 10 } }
                             }
                           },
                           plugins: {
                             legend: {
                               display: true,
                               position: "top",
-                              labels: { color: "#fff", font: { size: 11, weight: "600" } }
+                              labels: { color: chartLegendColor, font: { size: 11, weight: "600" } }
                             },
                             tooltip: {
                               backgroundColor: "rgba(15, 23, 42, 0.95)",
@@ -5215,19 +6338,76 @@ export const DashboardPage = () => {
                     </div>
                   </div>
 
-                  {/* Article-Specific Injected Ads Performance Table */}
-                  <div className="panel p-6 border border-white/5 bg-slate-900/10 rounded-3xl shadow-xl mt-6">
-                    <div className="border-b border-white/5 pb-3 mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  {/* Individual Campaign Performance Analytics */}
+                  <div className="panel p-6 border border-white/5 bg-slate-900/10 rounded-3xl shadow-xl mt-6 animate-[fadeIn_0.3s_ease-out]">
+                    <div className="border-b border-white/5 pb-4 mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
                           <BookOpen size={18} className="text-orange-400" />
-                          Individual In-Article Ad Performance
+                          Individual Campaign Performance Analytics
                         </h3>
-                        <p className="text-xs text-slate-500 mt-1">Detailed performance audit for sponsor banner campaigns targeted within specific news story blocks.</p>
+                        <p className="text-xs text-slate-500 mt-1">Detailed performance audit, click-through rates (CTR), and pricing ROI of all active ad placements.</p>
                       </div>
+
+                      {/* Sub-Revenue Dynamic Tracker */}
+                      {(() => {
+                        const filteredAds = ads.filter(a => {
+                          if (analyticsAdTab === "homepage" && a.placement === "in-article") return false;
+                          if (analyticsAdTab === "in-article" && a.placement !== "in-article") return false;
+                          return true;
+                        });
+                        const totalRevenue = filteredAds.reduce((sum, a) => sum + (a.amount || 0), 0);
+                        return (
+                          <div className="flex items-center gap-3 bg-white/[0.02] border border-white/5 rounded-2xl px-4 py-2 self-start lg:self-center">
+                            <div>
+                              <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">Category Billings</span>
+                              <span className="text-sm font-bold text-green-400">Rs. {totalRevenue.toLocaleString("en-IN")}</span>
+                            </div>
+                            <div className="h-8 w-px bg-white/10" />
+                            <div>
+                              <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">Campaigns</span>
+                              <span className="text-sm font-bold text-white">{filteredAds.length} Total</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Filter and Tab Controls */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+                      <div className="flex items-center gap-4 border-b border-white/5 pb-1 overflow-x-auto">
+                        <button
+                          type="button"
+                          onClick={() => setAnalyticsAdTab("all")}
+                          className={`pb-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-all duration-200 ${
+                            analyticsAdTab === "all" ? "border-orange-500 text-orange-400 font-bold" : "border-transparent text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          All Placements
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAnalyticsAdTab("homepage")}
+                          className={`pb-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-all duration-200 ${
+                            analyticsAdTab === "homepage" ? "border-orange-500 text-orange-400 font-bold" : "border-transparent text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Home Page Ads
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAnalyticsAdTab("in-article")}
+                          className={`pb-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-all duration-200 ${
+                            analyticsAdTab === "in-article" ? "border-orange-500 text-orange-400 font-bold" : "border-transparent text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          In-Article Injections
+                        </button>
+                      </div>
+
                       <input
                         className="w-full sm:w-64 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white focus:outline-none text-xs placeholder:text-slate-600"
-                        placeholder="Search by campaign, brand, or article..."
+                        placeholder="Search by campaign, brand, or slot..."
                         value={analyticsAdSearch}
                         onChange={(e) => setAnalyticsAdSearch(e.target.value)}
                       />
@@ -5239,8 +6419,9 @@ export const DashboardPage = () => {
                           <tr>
                             <th className="px-5 py-3 text-center" style={{ width: "5%" }}>S.No</th>
                             <th className="px-5 py-3">Sponsor Campaign</th>
-                            <th className="px-5 py-3">Targeted Article</th>
-                            <th className="px-5 py-3 text-center">Ad Spot Position</th>
+                            <th className="px-5 py-3">Placement Slot / Targeted Story</th>
+                            <th className="px-5 py-3 text-center">Placement Type</th>
+                            <th className="px-5 py-3 text-right">Ad Pricing (INR)</th>
                             <th className="px-5 py-3 text-center">Impressions</th>
                             <th className="px-5 py-3 text-center">Clicks</th>
                             <th className="px-5 py-3 text-center">CTR</th>
@@ -5249,14 +6430,19 @@ export const DashboardPage = () => {
                         </thead>
                         <tbody className="divide-y divide-white/5">
                           {(() => {
-                            const inArticleCampaigns = ads.filter(a => a.placement === "in-article");
-                            const filtered = inArticleCampaigns.filter(a => {
+                            const filtered = ads.filter(a => {
+                              // Filter by Tab
+                              if (analyticsAdTab === "homepage" && a.placement === "in-article") return false;
+                              if (analyticsAdTab === "in-article" && a.placement !== "in-article") return false;
+
+                              // Filter by Search Query
                               const q = analyticsAdSearch.toLowerCase().trim();
                               if (!q) return true;
                               const targetArticle = allArticles.find(art => art._id === a.articleId);
                               return (
                                 a.title.toLowerCase().includes(q) ||
                                 (a.companyName || "").toLowerCase().includes(q) ||
+                                (a.placement || "").toLowerCase().includes(q) ||
                                 (targetArticle?.title || "").toLowerCase().includes(q)
                               );
                             });
@@ -5264,8 +6450,8 @@ export const DashboardPage = () => {
                             if (filtered.length === 0) {
                               return (
                                 <tr>
-                                  <td colSpan={8} className="px-5 py-8 text-center text-slate-500 italic">
-                                    No targeted in-article campaigns found.
+                                  <td colSpan={9} className="px-5 py-8 text-center text-slate-500 italic">
+                                    No ad campaigns found matching your criteria.
                                   </td>
                                 </tr>
                               );
@@ -5274,6 +6460,29 @@ export const DashboardPage = () => {
                             return filtered.map((a, idx) => {
                               const targetArticle = allArticles.find(art => art._id === a.articleId);
                               const ctr = a.viewsCount > 0 ? ((a.clicksCount / a.viewsCount) * 100).toFixed(2) : "0.00";
+                              
+                              let placementLabel = "";
+                              if (a.placement === "in-article") {
+                                placementLabel = targetArticle 
+                                  ? `Article: ${targetArticle.title}`
+                                  : a.articleId === "all" ? "All Articles (Broadcast)" : "In-Article Injection";
+                              } else {
+                                const matchedPlacement = adPlacements.find(p => p.value === a.placement);
+                                placementLabel = matchedPlacement ? matchedPlacement.label : a.placement;
+                              }
+
+                              const getPlacementBadgeStyle = (placement) => {
+                                switch (placement) {
+                                  case "homepage-hero": return "bg-orange-500/10 text-orange-400 border border-orange-500/20";
+                                  case "homepage-latest": return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                                  case "homepage-district": return "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                                  case "homepage-popup": return "bg-rose-600/10 text-rose-300 border border-rose-600/20";
+                                  case "in-article": return "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
+                                  case "promotional-article": return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                                  default: return "bg-slate-500/10 text-slate-400 border border-slate-500/10";
+                                }
+                              };
+
                               return (
                                 <tr key={a._id} className="hover:bg-white/[0.01] transition-colors duration-150">
                                   <td className="px-5 py-3 text-center font-semibold text-slate-450">
@@ -5290,18 +6499,25 @@ export const DashboardPage = () => {
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="px-5 py-3 max-w-[200px] truncate">
-                                    {targetArticle ? (
+                                  <td className="px-5 py-3 max-w-[220px] truncate">
+                                    {a.placement === "in-article" && targetArticle ? (
                                       <span className="text-white hover:text-orange-400 cursor-pointer font-medium text-xs" onClick={() => openArticleFromDashboard(targetArticle)} title={targetArticle.title}>
-                                        {targetArticle.title}
+                                        {placementLabel}
                                       </span>
                                     ) : (
-                                      <span className="text-slate-500 italic text-xs">All Articles (Broadcast)</span>
+                                      <span className="text-slate-300 text-xs font-medium" title={placementLabel}>{placementLabel}</span>
                                     )}
                                   </td>
-                                  <td className="px-5 py-3 whitespace-nowrap capitalize text-slate-400 text-center text-xs">
-                                    {String(a.adPosition).replaceAll("-", " ")}
-                                    {a.adPosition === "between-paragraphs" ? ` (Para ${a.paragraphIndex})` : ""}
+                                  <td className="px-5 py-3 text-center whitespace-nowrap">
+                                    <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${getPlacementBadgeStyle(a.placement)}`}>
+                                      {a.placement === "in-article" 
+                                        ? `${String(a.adPosition).replaceAll("-", " ")}${a.adPosition === "between-paragraphs" ? ` (Para ${a.paragraphIndex})` : ""}`
+                                        : a.placement.replaceAll("-", " ")
+                                      }
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-3 text-right text-green-400 font-bold whitespace-nowrap text-xs">
+                                    Rs. {Number(a.amount || 0).toLocaleString("en-IN")}
                                   </td>
                                   <td className="px-5 py-3 text-center text-white font-semibold whitespace-nowrap text-xs">
                                     {Number(a.viewsCount || 0).toLocaleString("en-IN")}
@@ -5332,6 +6548,543 @@ export const DashboardPage = () => {
                 </>
               );
             })()}
+          </div>
+        )}
+        {adDeskSubTab === "pricing" && (
+          /* DYNAMIC AD PACKAGE PRICING CONTROLS */
+          <div className="panel p-6 bg-slate-900/40 border border-white/5 rounded-3xl space-y-6 animate-[fadeIn_0.3s_ease-out]">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold text-white">Sponsorship Package Pricing Desk</h2>
+              <p className="text-xs text-slate-450 leading-relaxed">
+                Platform Super Admin console to adjust the daily base billing rates for all advertisement placements. 
+                Updates are saved dynamically in Firestore and are reflected live on the public booking checkout.
+              </p>
+            </div>
+
+            <form onSubmit={saveCustomPricing} className="space-y-6">
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {/* Hero Rail */}
+                <div className="panel p-5 bg-[#0b0f19]/80 border border-white/5 rounded-2xl flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <Megaphone size={16} />
+                      <h4 className="text-sm font-bold text-white">Homepage Hero Rail</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      Shows near the top of the homepage alongside primary featured stories. High impact visual placement.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Base Daily Rate (INR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+                      value={adPricingHero}
+                      onChange={(e) => setAdPricingHero(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Latest Updates Grid */}
+                <div className="panel p-5 bg-[#0b0f19]/80 border border-white/5 rounded-2xl flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <Megaphone size={16} />
+                      <h4 className="text-sm font-bold text-white">Latest Updates Grid</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      Appears in-between major latest news rails in standard reading flow. Highly scrolled feed zone.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Base Daily Rate (INR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+                      value={adPricingLatest}
+                      onChange={(e) => setAdPricingLatest(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* District Coverage Strip */}
+                <div className="panel p-5 bg-[#0b0f19]/80 border border-white/5 rounded-2xl flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <Megaphone size={16} />
+                      <h4 className="text-sm font-bold text-white">District Coverage Strip</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      Sponsor banner appearing lower on the homepage near the district news filter lists. Local target segment.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Base Daily Rate (INR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+                      value={adPricingDistrict}
+                      onChange={(e) => setAdPricingDistrict(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* In-Article injection */}
+                <div className="panel p-5 bg-[#0b0f19]/80 border border-white/5 rounded-2xl flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <Megaphone size={16} />
+                      <h4 className="text-sm font-bold text-white">In-Article Injection</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      Custom banners injected dynamically between editorial paragraphs inside single article views. Focused readership.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Base Daily Rate (INR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+                      value={adPricingInArticle}
+                      onChange={(e) => setAdPricingInArticle(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Promotional Launch Article */}
+                <div className="panel p-5 bg-[#0b0f19]/80 border border-white/5 rounded-2xl flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-400">
+                      <Newspaper size={16} />
+                      <h4 className="text-sm font-bold text-white">Promotional Launch Article</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      Full paid press releases and business event updates published directly under Promotions & Launches.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Base Daily Rate (INR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+                      value={adPricingPromotional}
+                      onChange={(e) => setAdPricingPromotional(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Homepage Premium Pop-up Ad */}
+                <div className="panel p-5 bg-[#0b0f19]/80 border border-white/5 rounded-2xl flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-rose-400">
+                      <Sliders size={16} />
+                      <h4 className="text-sm font-bold text-white">Homepage Premium Pop-up</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      High-impact animated backdrop-blurred pop-up interstitial ad triggering instantly upon home page load.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Base Daily Rate (INR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500/20"
+                      value={adPricingPopup}
+                      onChange={(e) => setAdPricingPopup(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-white/5">
+                <button
+                  type="submit"
+                  className="rounded-full bg-orange-600 hover:bg-orange-500 text-white px-6 py-2.5 text-xs font-bold transition shadow-lg shadow-orange-950/30 flex items-center gap-1.5"
+                >
+                  <Check size={14} /> Save Ad Package Prices
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {adDeskSubTab === "popups" && (
+          /* POPUPS WORKSPACE MANAGEMENT PANEL */
+          <div className="panel p-6 bg-slate-900/40 border border-white/5 rounded-3xl space-y-6 animate-[fadeIn_0.3s_ease-out]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Layers size={18} className="text-orange-400" />
+                  Premium Homepage Pop-up Interstitial Desk
+                </h2>
+                <p className="text-xs text-slate-455 leading-relaxed">
+                  Super Admin cockpit to manage active, priority-weighted pop-up campaign loops. 
+                  Target specific Jharkhand districts, blocks, and restrict displaying hours dynamically.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  resetAdForm();
+                  setAdForm({
+                    ...initialAdForm,
+                    placement: "homepage-popup",
+                    amount: Number(adPricingPopup) * 7,
+                    durationDays: 7
+                  });
+                  setIsCreatingAd(true);
+                }}
+                className="rounded-full bg-orange-500 hover:bg-orange-400 text-white px-5 py-2.5 text-xs font-bold transition-all duration-250 flex items-center gap-2 shadow-lg hover:scale-105 active:scale-95 self-start sm:self-center"
+              >
+                <Plus size={14} /> Launch Pop-up Campaign
+              </button>
+            </div>
+
+            {/* Pop-up Spin Algorithms & Visibility Control Console */}
+            <div className="panel p-6 border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-md rounded-3xl space-y-6 shadow-xl relative overflow-hidden">
+              {/* Premium decorative gradient highlight */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                    <Sliders size={20} className="animate-[pulse_2s_infinite]" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Pop-up Interstitial Display Routing</h3>
+                    <p className="text-xs text-slate-400">Manage visibility and rotate campaign displays in real-time on the homepage.</p>
+                  </div>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => savePopupSettings("loop_carousel")}
+                  className={`rounded-full px-5 py-2.5 text-xs font-bold transition-all duration-300 flex items-center gap-2 border shadow-md hover:scale-105 active:scale-95 ${
+                    popupDisplayMode === "loop_carousel"
+                      ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white border-transparent shadow-orange-950/50 animate-pulse"
+                      : "bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border-orange-500/20"
+                  }`}
+                >
+                  <Layers size={14} /> Loop All Active Popups (Carousel)
+                </button>
+              </div>
+
+              {/* Selection cards for spin algorithms */}
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  {
+                    id: "weighted_random",
+                    title: "Weighted Random",
+                    desc: "Serves campaigns based on their priority weight (High weight appears proportionally more often).",
+                    badge: "Dynamic"
+                  },
+                  {
+                    id: "sequence",
+                    title: "Sequenced Rotation",
+                    desc: "Rotates active pop-up campaigns sequentially on each user visit session via localized rotation.",
+                    badge: "Fair Share"
+                  },
+                  {
+                    id: "locked_single",
+                    title: "Locked Spotlight",
+                    desc: "Pins exactly one selected active campaign. Ideal for urgent notifications and premium sponsorships.",
+                    badge: "Pinned"
+                  },
+                  {
+                    id: "loop_carousel",
+                    title: "Carousel Slideshow",
+                    desc: "Fades and transitions all active pop-ups inside a dynamic front-end slider carousel loop.",
+                    badge: "Infinite Loop"
+                  }
+                ].map((algo) => {
+                  const isActive = popupDisplayMode === algo.id;
+                  return (
+                    <div
+                      key={algo.id}
+                      onClick={() => savePopupSettings(algo.id)}
+                      className={`relative cursor-pointer rounded-2xl p-4 border transition-all duration-300 flex flex-col justify-between h-full group select-none hover:scale-[1.01] ${
+                        isActive
+                          ? "bg-orange-950/20 border-orange-500/40 shadow-lg shadow-orange-950/20"
+                          : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-xs font-bold transition-colors ${isActive ? "text-orange-400" : "text-white group-hover:text-orange-400"}`}>
+                            {algo.title}
+                          </span>
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors ${
+                            isActive 
+                              ? "bg-orange-500/20 text-orange-300"
+                              : "bg-white/5 text-slate-400"
+                          }`}>
+                            {algo.badge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-450 leading-relaxed transition-colors group-hover:text-slate-350">{algo.desc}</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 mt-4 pt-3 border-t border-white/5 text-[10px] font-bold">
+                        {isActive ? (
+                          <span className="text-orange-400 flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-orange-400 animate-pulse" /> Active Routing
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Click to activate</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Conditional Spotlight Selector Panel */}
+              {popupDisplayMode === "locked_single" && (
+                <div className="p-4 rounded-2xl bg-orange-950/10 border border-orange-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-[fadeIn_0.25s_ease-out]">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center border border-orange-500/20">
+                      <Lock size={14} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Select Pinned Campaign</h4>
+                      <p className="text-[10px] text-slate-400">Specify which active campaign is shown exclusively to visitors.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 w-full md:w-auto">
+                    {(() => {
+                      const activePopups = ads.filter(a => a && a.placement === "homepage-popup" && a.status === "active");
+                      if (!activePopups.length) {
+                        return (
+                          <span className="text-xs text-orange-300/80 italic font-semibold">
+                            ⚠️ No active pop-up campaigns live. Please activate a pop-up first!
+                          </span>
+                        );
+                      }
+                      
+                      return (
+                        <select
+                          className="w-full md:w-80 rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+                          value={popupLockedAdId}
+                          onChange={(e) => savePopupSettings("locked_single", e.target.value)}
+                        >
+                          <option value="">-- Choose active campaign --</option>
+                          {activePopups.map((ad) => {
+                            const rawPriority = Number(ad.priority || 10);
+                            const weight = Math.max(1, 11 - rawPriority);
+                            return (
+                              <option key={ad._id} value={ad._id}>
+                                {ad.title || "Untitled Campaign"} ({ad.advertiserName || "No Brand"} - Weight: {weight})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Metrics */}
+            {(() => {
+              const popupAds = ads.filter(ad => ad && ad.placement === "homepage-popup");
+              const activeCount = popupAds.filter(a => a.status === "active").length;
+              const totalViews = popupAds.reduce((sum, a) => sum + Number(a.viewsCount || 0), 0);
+              const totalClicks = popupAds.reduce((sum, a) => sum + Number(a.clicksCount || 0), 0);
+              const ctr = totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(2) : "0.00";
+              
+              return (
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                  <div className="panel p-4 border border-white/5 bg-slate-950/40 rounded-2xl flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Campaigns</span>
+                    <span className="text-lg font-bold text-white mt-1">{popupAds.length} Created</span>
+                  </div>
+                  <div className="panel p-4 border border-white/5 bg-slate-950/40 rounded-2xl flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Active in Loop</span>
+                    <span className="text-lg font-bold text-green-400 mt-1 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+                      {activeCount} Live
+                    </span>
+                  </div>
+                  <div className="panel p-4 border border-white/5 bg-slate-950/40 rounded-2xl flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Impressions</span>
+                    <span className="text-lg font-bold text-orange-400 mt-1">{totalViews.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="panel p-4 border border-white/5 bg-slate-950/40 rounded-2xl flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Average Pop-up CTR</span>
+                    <span className="text-lg font-bold text-white mt-1">{ctr}%</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Pop-up Ads Directory Table */}
+            <div className="panel overflow-hidden border border-white/5 bg-slate-900/10 rounded-3xl">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1200px] border-collapse text-left text-xs text-slate-350">
+                  <thead className="border-b border-white/5 bg-white/[0.02] text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="px-5 py-3 text-center" style={{ width: "5%" }}>S.No</th>
+                      <th className="px-5 py-3">Campaign & Brand</th>
+                      <th className="px-5 py-3 text-center" style={{ width: "12%" }}>Priority Weight</th>
+                      <th className="px-5 py-3">Target Geofencing</th>
+                      <th className="px-5 py-3">Active Hours</th>
+                      <th className="px-5 py-3 text-right">Pricing (INR)</th>
+                      <th className="px-5 py-3 text-center">Duration</th>
+                      <th className="px-5 py-3 text-center">CTR Stats</th>
+                      <th className="px-5 py-3 text-center">Status</th>
+                      <th className="px-5 py-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {(() => {
+                      const popupAds = ads.filter(ad => ad && ad.placement === "homepage-popup");
+                      
+                      if (!popupAds.length) {
+                        return (
+                          <tr>
+                            <td colSpan={10} className="px-5 py-16 text-center text-slate-500 italic text-sm">
+                              No premium pop-up campaigns found. Click "Launch Pop-up Campaign" to create your first interstitial ad!
+                            </td>
+                          </tr>
+                        );
+                      }
+                      
+                      const formatHr = (h) => {
+                        if (h === undefined || h === null) return "All Day";
+                        if (h === 0) return "12 AM";
+                        if (h === 12) return "12 PM";
+                        if (h === 24) return "12 AM";
+                        return h > 12 ? `${h - 12} PM` : `${h} AM`;
+                      };
+
+                      return popupAds.map((ad, idx) => {
+                        const ctr = ad.viewsCount > 0 ? ((ad.clicksCount / ad.viewsCount) * 100).toFixed(2) : "0.00";
+                        const rawPriority = Number(ad.priority || 10);
+                        const weight = Math.max(1, 11 - rawPriority);
+                        
+                        return (
+                          <tr key={ad._id} className="hover:bg-white/[0.01] transition-colors duration-150">
+                            <td className="px-5 py-4 text-center font-semibold text-slate-400">
+                              {idx + 1}
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                {ad.imageUrl ? (
+                                  <img src={ad.imageUrl} alt={ad.title} className="h-8 w-12 object-cover rounded-lg border border-white/10 flex-shrink-0" />
+                                ) : (
+                                  <div className="h-8 w-12 rounded-lg border border-dashed border-white/15 bg-white/[0.01] flex items-center justify-center text-[9px] text-slate-500">No Image</div>
+                                )}
+                                <div className="truncate max-w-[180px]">
+                                  <p className="font-bold text-white truncate text-xs" title={ad.title}>{ad.title}</p>
+                                  <p className="text-[10px] text-slate-500 truncate mt-0.5" title={ad.companyName}>Brand: {ad.companyName || "Sponsor"}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-center whitespace-nowrap">
+                              <div className="flex flex-col items-center justify-center">
+                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                  rawPriority <= 3 
+                                    ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                    : rawPriority <= 7
+                                      ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                                      : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                                }`}>
+                                  Level {rawPriority}
+                                </span>
+                                <span className="text-[8px] text-slate-500 mt-1 font-semibold">Weight: {weight}x weight</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              {ad.targetDistricts?.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                  {ad.targetDistricts.map((d) => (
+                                    <span key={d} className="rounded bg-orange-500/10 border border-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-400">
+                                      {d}
+                                    </span>
+                                  ))}
+                                  {ad.targetBlocks?.length > 0 && (
+                                    <span className="rounded bg-slate-800 border border-white/5 px-1.5 py-0.5 text-[9px] font-semibold text-slate-400">
+                                      +{ad.targetBlocks.length} Blocks
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 font-semibold italic flex items-center gap-1">
+                                  <Globe size={11} className="text-slate-500 animate-spin-slow" />
+                                  Jharkhand Broadcast
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap font-medium text-slate-300">
+                              {ad.timeTargeting && (ad.timeTargeting.startHour > 0 || ad.timeTargeting.endHour < 24) ? (
+                                <span className="text-orange-400 font-bold">
+                                  {formatHr(ad.timeTargeting.startHour)} - {formatHr(ad.timeTargeting.endHour)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 italic">All Day (24h loop)</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 text-right font-bold text-white whitespace-nowrap">
+                              Rs. {Number(ad.amount || 0).toLocaleString("en-IN")}
+                            </td>
+                            <td className="px-5 py-4 text-center font-medium text-slate-400 whitespace-nowrap">
+                              {ad.durationDays} Days
+                            </td>
+                            <td className="px-5 py-4 text-center whitespace-nowrap">
+                              <div className="flex flex-col items-center">
+                                <span className="font-bold text-white text-xs">{Number(ad.viewsCount || 0).toLocaleString("en-IN")} Views</span>
+                                <span className="text-[10px] text-slate-500 mt-0.5">{Number(ad.clicksCount || 0).toLocaleString("en-IN")} Clicks ({ctr}% CTR)</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-center whitespace-nowrap">
+                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                                ad.status === "active"
+                                  ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                  : ad.status === "expired"
+                                    ? "bg-slate-500/10 text-slate-400 border border-slate-500/10"
+                                    : ad.status === "pending_approval" || ad.status === "pending_payment"
+                                      ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 animate-pulse"
+                                      : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              }`}>
+                                {String(ad.status).replaceAll("_", " ")}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => startEditAd(ad)}
+                                  className="rounded-lg bg-orange-500/5 hover:bg-orange-600 border border-orange-500/10 hover:border-transparent text-orange-400 hover:text-white p-1.5 transition duration-150"
+                                  title="Edit Campaign"
+                                >
+                                  <Edit3 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingAdDelete(ad)}
+                                  className="rounded-lg bg-rose-500/5 hover:bg-rose-600 border border-rose-500/10 hover:border-transparent text-rose-400 hover:text-white p-1.5 transition duration-150"
+                                  title="Delete Campaign"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -5710,117 +7463,276 @@ export const DashboardPage = () => {
   };
 
   const renderSettings = () => {
+    const isRepOrEditor = user?.role === "reporter" || user?.role === "chief_editor";
+    const blocks = credentialForm.district ? jharkhandBlocksByDistrict[credentialForm.district] || [] : [];
+
     return (
       <div id="account-credentials-panel" className="panel p-6 border border-white/5 bg-slate-900/10 animate-[fadeIn_0.4s_ease-out]">
+        
+        {/* Rejection Feedback Alert */}
+        {profile?.approvalStatus === "rejected" && (
+          <div className="mb-6 rounded-[24px] border border-rose-500/20 bg-rose-500/10 p-5">
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-rose-500/20 p-2 text-rose-400 border border-rose-500/30">
+                <AlertCircle size={20} />
+              </div>
+              <div className="flex-grow">
+                <h4 className="text-base font-bold text-rose-300">Onboarding Request Rejected</h4>
+                <p className="mt-1 text-sm text-slate-300">
+                  Your onboarding application was rejected by the super admin. Please review the official feedback below, correct your KYC details, and resubmit your profile for review.
+                </p>
+                {profile?.rejectionFeedback && (
+                  <div className="mt-3 rounded-xl bg-slate-950/50 border border-white/5 p-3 font-mono text-xs text-rose-200">
+                    <strong>Admin Feedback:</strong> {profile.rejectionFeedback}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400">Security & Credentials</p>
-            <h2 className="text-2xl font-bold text-white mt-1">Account Credentials</h2>
-            <p className="mt-2 text-sm text-slate-400">Update your login phone, email, display name, and password securely.</p>
+            <h2 className="text-2xl font-bold text-white mt-1">
+              {profile?.approvalStatus === "rejected" ? "Refill Onboarding KYC & Settings" : "Account Settings"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-400">
+              {profile?.approvalStatus === "rejected" 
+                ? "Correct your personal, jurisdiction, security details, and KYC files to resubmit." 
+                : "Update your login phone, email, display name, password, and KYC parameters."}
+            </p>
           </div>
           <button type="button" onClick={resetCredentialForm} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/5 transition">
             Reset Form
           </button>
         </div>
-        <form onSubmit={submitCredentials} className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div>
-            <input
-              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
-              placeholder="Full name"
-              value={credentialForm.fullName}
-              onChange={(event) => setCredentialForm({ ...credentialForm, fullName: event.target.value })}
-            />
-            <p className="mt-2 text-xs text-slate-500">This name appears in your dashboard profile and bylines.</p>
-          </div>
-          <div>
-            <input
-              type="email"
-              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
-              placeholder="Email address"
-              value={credentialForm.email}
-              onChange={(event) => setCredentialForm({ ...credentialForm, email: event.target.value })}
-            />
-            <p className="mt-2 text-xs text-slate-500">Use a valid email address so account recovery remains clean.</p>
-          </div>
-          <div className="lg:col-span-2">
-            <input
-              inputMode="numeric"
-              maxLength="10"
-              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
-              placeholder="10-digit login phone number"
-              value={credentialForm.phone}
-              onChange={(event) =>
-                setCredentialForm({
-                  ...credentialForm,
-                  phone: event.target.value.replace(/\D/g, "").slice(0, 10),
-                })
-              }
-            />
-            <p className="mt-2 text-xs text-slate-500">This phone number is your login ID, so keep it unique and exactly 10 digits.</p>
-          </div>
-          <div>
-            <div className="relative">
+        
+        <form onSubmit={submitCredentials} className="mt-5 space-y-6">
+          <div className="grid gap-4 lg:grid-cols-2">
+            
+            {/* Row 1: Full name and Email */}
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">Full Name</label>
               <input
-                type={showCurrentPassword ? "text" : "password"}
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
-                placeholder="Current password"
-                value={credentialForm.currentPassword}
-                onChange={(event) => setCredentialForm({ ...credentialForm, currentPassword: event.target.value })}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+                placeholder="Full name"
+                value={credentialForm.fullName}
+                onChange={(event) => setCredentialForm({ ...credentialForm, fullName: event.target.value })}
               />
-              <button
-                type="button"
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
-                onClick={() => setShowCurrentPassword((value) => !value)}
-                aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
-              >
-                {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              <p className="mt-2 text-xs text-slate-500">This name must match your Aadhaar card details.</p>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Enter this only when you want to set a new password.</p>
-          </div>
-          <div>
-            <div className="relative">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">Email Address</label>
               <input
-                type={showNewPassword ? "text" : "password"}
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
-                placeholder="New password"
-                value={credentialForm.newPassword}
-                onChange={(event) => setCredentialForm({ ...credentialForm, newPassword: event.target.value })}
+                type="email"
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+                placeholder="Email address"
+                value={credentialForm.email}
+                onChange={(event) => setCredentialForm({ ...credentialForm, email: event.target.value })}
               />
-              <button
-                type="button"
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
-                onClick={() => setShowNewPassword((value) => !value)}
-                aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-              >
-                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              <p className="mt-2 text-xs text-slate-500">Email is used for secure communications and document delivery.</p>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Leave the password fields empty if you only want to update name, phone, or email.</p>
-          </div>
-          <div className="lg:col-span-2">
-            <div className="relative">
+
+            {/* Row 2: Phone number */}
+            <div className="lg:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">Login Phone Number</label>
               <input
-                type={showConfirmPassword ? "text" : "password"}
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
-                placeholder="Confirm new password"
-                value={credentialForm.confirmNewPassword}
-                onChange={(event) => setCredentialForm({ ...credentialForm, confirmNewPassword: event.target.value })}
+                inputMode="numeric"
+                maxLength="10"
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+                placeholder="10-digit login phone number"
+                value={credentialForm.phone}
+                onChange={(event) =>
+                  setCredentialForm({
+                    ...credentialForm,
+                    phone: event.target.value.replace(/\D/g, "").slice(0, 10),
+                  })
+                }
               />
-              <button
-                type="button"
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
-                onClick={() => setShowConfirmPassword((value) => !value)}
-                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              <p className="mt-2 text-xs text-slate-500">This phone number is your login ID, so keep it unique and exactly 10 digits.</p>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Your new password must be at least 6 characters long.</p>
+
+            {/* If user is reporter or chief editor, show all KYC and uploads fields */}
+            {isRepOrEditor && (
+              <>
+                <div className="lg:col-span-2 border-t border-white/5 pt-5 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-400 mb-4">Jurisdiction & Digital KYC Details</p>
+                </div>
+
+                {/* District Select */}
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2 font-semibold flex items-center gap-1.5"><Globe size={13} className="text-slate-400" /> District</label>
+                  <select
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white focus:outline-none cursor-pointer"
+                    value={credentialForm.district}
+                    onChange={(e) => setCredentialForm({ ...credentialForm, district: e.target.value, area: "" })}
+                  >
+                    <option value="" className="text-slate-500">Select Jurisdiction District</option>
+                    {jharkhandDistricts.map((d) => (
+                      <option key={d} value={d} className="bg-slate-950 text-slate-300">{d}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Block / Area Select */}
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2 font-semibold flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" /> Block / Area</label>
+                  <select
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!credentialForm.district}
+                    value={credentialForm.area}
+                    onChange={(e) => setCredentialForm({ ...credentialForm, area: e.target.value })}
+                  >
+                    <option value="" className="text-slate-500">{credentialForm.district ? "Select Block / Area" : "Select District First"}</option>
+                    {blocks.map((b) => (
+                      <option key={b} value={b} className="bg-slate-950 text-slate-300">{b}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Aadhaar Number */}
+                <div className="lg:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2 font-semibold flex items-center gap-1.5"><ShieldAlert size={13} className="text-slate-400" /> Aadhaar Card Number</label>
+                  <input
+                    inputMode="numeric"
+                    maxLength="12"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+                    placeholder="12-digit Aadhaar identification number"
+                    value={credentialForm.aadhaarNumber}
+                    onChange={(event) =>
+                      setCredentialForm({
+                        ...credentialForm,
+                        aadhaarNumber: event.target.value.replace(/\D/g, "").slice(0, 12),
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Blood Group */}
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2 font-semibold flex items-center gap-1.5"><Droplet size={13} className="text-slate-400" /> Blood Group</label>
+                  <select
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white focus:outline-none cursor-pointer"
+                    value={credentialForm.bloodGroup}
+                    onChange={(e) => setCredentialForm({ ...credentialForm, bloodGroup: e.target.value })}
+                  >
+                    {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((g) => (
+                      <option key={g} value={g} className="bg-slate-950 text-slate-300">{g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Education */}
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2 font-semibold flex items-center gap-1.5"><GraduationCap size={13} className="text-slate-400" /> Educational Qualification</label>
+                  <input
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none"
+                    placeholder="Highest qualification (e.g. Graduate, Post Graduate)"
+                    value={credentialForm.education}
+                    onChange={(event) => setCredentialForm({ ...credentialForm, education: event.target.value })}
+                  />
+                </div>
+
+                {/* Document Pickers */}
+                <div className="lg:col-span-2 border-t border-white/5 pt-5 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-400 mb-4">Verification Media Documents</p>
+                  <p className="text-xs text-slate-400 mb-4">Please upload highly clear digital scans or captures to facilitate swift background audit approvals.</p>
+                </div>
+
+                <div className="lg:col-span-2 grid gap-5 md:grid-cols-2 lg:grid-cols-2 animate-[fadeIn_0.4s_ease-out]">
+                  <ImagePicker 
+                    label="Profile Photo (Formal)" 
+                    value={credentialForm.profilePhotoUrl} 
+                    onChange={(val) => setCredentialForm({ ...credentialForm, profilePhotoUrl: val })} 
+                  />
+                  <ImagePicker 
+                    label="Aadhaar Card Scan" 
+                    value={credentialForm.aadhaarImageUrl} 
+                    onChange={(val) => setCredentialForm({ ...credentialForm, aadhaarImageUrl: val })} 
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Row 3: Security & Passwords */}
+            <div className="lg:col-span-2 border-t border-white/5 pt-5 mt-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-400 mb-2">Change Password</p>
+              <p className="text-xs text-slate-400 mb-4">Leave the password fields empty if you only want to update KYC or credential details.</p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">Current Password</label>
+              <div className="relative">
+                <input
+                  type={showCurrentPassword ? "text" : "password"}
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
+                  placeholder="Current password"
+                  value={credentialForm.currentPassword}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, currentPassword: event.target.value })}
+                />
+                <button
+                  type="button"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
+                  onClick={() => setShowCurrentPassword((value) => !value)}
+                  aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
+                >
+                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">New Password</label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
+                  placeholder="New password"
+                  value={credentialForm.newPassword}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, newPassword: event.target.value })}
+                />
+                <button
+                  type="button"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
+                  onClick={() => setShowNewPassword((value) => !value)}
+                  aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                >
+                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">Confirm New Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white focus:outline-none"
+                  placeholder="Confirm new password"
+                  value={credentialForm.confirmNewPassword}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, confirmNewPassword: event.target.value })}
+                />
+                <button
+                  type="button"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
+                  onClick={() => setShowConfirmPassword((value) => !value)}
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button className="rounded-2xl bg-orange-500 hover:bg-orange-400 transition px-4 py-3.5 font-bold text-white lg:col-span-2 shadow-lg shadow-orange-950/20 tracking-wide uppercase text-sm mt-4">
+              {credentialBusy 
+                ? "Saving..." 
+                : profile?.approvalStatus === "rejected" 
+                  ? "Resubmit Profile for Onboarding Review" 
+                  : "Update Account Details"}
+            </button>
           </div>
-          <button className="rounded-2xl bg-orange-500 hover:bg-orange-400 transition px-4 py-3 font-semibold text-white lg:col-span-2 shadow-lg">
-            {credentialBusy ? "Saving..." : "Update Credentials"}
-          </button>
         </form>
       </div>
     );
@@ -5927,12 +7839,12 @@ export const DashboardPage = () => {
                     maintainAspectRatio: false,
                     scales: {
                       y: {
-                        grid: { color: "rgba(255, 255, 255, 0.05)" },
-                        ticks: { color: "rgba(148, 163, 184, 0.7)", font: { size: 10 } }
+                        grid: { color: chartGridColor },
+                        ticks: { color: chartTicksColor, font: { size: 10 } }
                       },
                       x: {
                         grid: { display: false },
-                        ticks: { color: "rgba(148, 163, 184, 0.7)", font: { size: 10 } }
+                        ticks: { color: chartTicksColor, font: { size: 10 } }
                       }
                     },
                     plugins: {
@@ -5994,12 +7906,12 @@ export const DashboardPage = () => {
                     scales: {
                       y: {
                         max: 100,
-                        grid: { color: "rgba(255, 255, 255, 0.05)" },
-                        ticks: { color: "rgba(148, 163, 184, 0.7)", font: { size: 10 } }
+                        grid: { color: chartGridColor },
+                        ticks: { color: chartTicksColor, font: { size: 10 } }
                       },
                       x: {
                         grid: { display: false },
-                        ticks: { color: "rgba(148, 163, 184, 0.7)", font: { size: 10 } }
+                        ticks: { color: chartTicksColor, font: { size: 10 } }
                       }
                     },
                     plugins: {
@@ -6150,6 +8062,8 @@ export const DashboardPage = () => {
         message={actionPopup?.message}
         persistent={actionPopup?.persistent}
         onClose={actionPopup?.persistent ? undefined : () => setActionPopup(null)}
+        progress={actionPopup?.progress}
+        progressLabel={actionPopup?.progressLabel}
       />
       
       <ConfirmActionModal
@@ -6166,7 +8080,205 @@ export const DashboardPage = () => {
         }}
         onConfirm={confirmPublishedArchiveDelete}
       />
+
+      {/* Premium Inspect & Edit Modal */}
+      {inspectingAd && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md animate-[fadeIn_0.25s_ease-out]">
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[32px] border border-white/10 bg-[#0f172a]/95 p-6 shadow-2xl space-y-6">
+            
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
+              <div>
+                <span className="rounded-full bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-orange-400">
+                  Ad Campaign Inspection
+                </span>
+                <h3 className="mt-2 text-xl font-bold text-white leading-tight">{inspectingAd.title}</h3>
+                <p className="text-xs text-slate-500 mt-1 font-semibold">Submitted by {inspectingAd.companyName || "Sponsor Brand"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectingAd(null)}
+                className="rounded-full border border-white/10 p-2 text-slate-400 hover:text-white transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Layout content */}
+            <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
+              <div className="space-y-4">
+                {inspectingAd.imageUrl ? (
+                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 p-2 max-h-48 flex items-center justify-center">
+                    <img src={inspectingAd.imageUrl} alt={inspectingAd.title} className="max-h-40 max-w-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.01] p-8 text-center text-xs text-slate-500">
+                    No banner / cover image supplied.
+                  </div>
+                )}
+
+                {inspectingAd.description && (
+                  <div className="space-y-1">
+                    <span className="block text-[9px] uppercase tracking-wider text-slate-550">Short Summary / Excerpt</span>
+                    <p className="text-xs leading-relaxed text-slate-300 bg-white/[0.01] p-3 rounded-xl border border-white/5">{inspectingAd.description}</p>
+                  </div>
+                )}
+
+                {inspectingAd.placement === "promotional-article" && inspectingAd.promotionalContent && (
+                  <div className="space-y-1">
+                    <span className="block text-[9px] uppercase tracking-wider text-emerald-400 font-bold">Promotional Story Body</span>
+                    <div className="max-h-44 overflow-y-auto text-xs leading-relaxed text-slate-350 bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10 font-mono whitespace-pre-wrap">
+                      {inspectingAd.promotionalContent}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4 rounded-2xl bg-white/[0.01] border border-white/5 p-4 text-xs text-slate-400">
+                <div className="space-y-2.5">
+                  <p className="flex justify-between border-b border-white/5 pb-1">
+                    <span>Ad Placement Slot:</span>
+                    <span className="text-white font-bold">{adPlacements.find(p => p.value === inspectingAd.placement)?.label || inspectingAd.placement}</span>
+                  </p>
+                  <p className="flex justify-between border-b border-white/5 pb-1">
+                    <span>Running Duration:</span>
+                    <span className="text-white font-bold">{inspectingAd.durationDays} Days</span>
+                  </p>
+                  <p className="flex justify-between border-b border-white/5 pb-1">
+                    <span>Pricing Invoiced:</span>
+                    <span className="text-green-400 font-bold">Rs. {Number(inspectingAd.amount || 0).toLocaleString("en-IN")}</span>
+                  </p>
+                  
+                  {inspectingAd.placement === "promotional-article" ? (
+                    <>
+                      <p className="flex justify-between border-b border-white/5 pb-1">
+                        <span>Target District:</span>
+                        <span className="text-white font-bold">{inspectingAd.district || "Palamu"}</span>
+                      </p>
+                      <p className="flex justify-between border-b border-white/5 pb-1">
+                        <span>Target block:</span>
+                        <span className="text-white font-bold">{inspectingAd.block || "Medininagar"}</span>
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="flex justify-between border-b border-white/5 pb-1">
+                        <span>CTA Button Text:</span>
+                        <span className="text-white font-bold">{inspectingAd.ctaLabel || "Visit Sponsor"}</span>
+                      </p>
+                      <p className="flex justify-between border-b border-white/5 pb-1">
+                        <span>Redirect URL:</span>
+                        <span className="text-orange-400 font-bold truncate max-w-[120px]">{inspectingAd.targetUrl || "None"}</span>
+                      </p>
+                    </>
+                  )}
+
+                  <p className="flex flex-col gap-0.5 border-b border-white/5 pb-1">
+                    <span>Advertiser Contact:</span>
+                    <span className="text-white font-semibold">{inspectingAd.advertiserName} ({inspectingAd.advertiserPhone || inspectingAd.advertiserEmail})</span>
+                  </p>
+                </div>
+
+                {inspectingAd.notes && (
+                  <div className="mt-3 rounded-xl bg-orange-500/5 border border-orange-500/10 p-2.5 text-[10px] text-orange-200 leading-normal">
+                    <span className="font-semibold block uppercase tracking-wider text-[8px] text-orange-400 mb-0.5">Advertiser Notes</span>
+                    {inspectingAd.notes}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/5 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setInspectingAd(null);
+                  startEditAd(inspectingAd);
+                }}
+                className="rounded-full bg-white text-slate-900 hover:bg-slate-150 px-5 py-2 text-xs font-bold transition shadow-md hover:scale-105 active:scale-95"
+              >
+                Edit Parameters First
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = inspectingAd._id;
+                    setInspectingAd(null);
+                    setPendingAdApproveId(id);
+                  }}
+                  className="rounded-full bg-green-600 hover:bg-green-500 text-white px-5 py-2 text-xs font-bold transition shadow-md hover:scale-105 active:scale-95"
+                >
+                  Approve & Publish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = inspectingAd._id;
+                    setInspectingAd(null);
+                    rejectAd(id);
+                  }}
+                  className="rounded-full bg-rose-600/10 border border-rose-500/20 text-rose-450 hover:bg-rose-600 hover:text-white px-5 py-2 text-xs font-bold transition"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
+      <ConfirmActionModal
+        open={Boolean(pendingAdPause)}
+        title={pendingAdPause?.status === "active" ? "Pause Advertisement" : "Resume Advertisement"}
+        description={
+          pendingAdPause?.status === "active"
+            ? `Are you sure you want to pause the campaign "${pendingAdPause?.title || "this advertisement"}"? This will temporarily deactivate the sponsor ad banner on target page views, but preserves all paid duration.`
+            : `Are you sure you want to resume the campaign "${pendingAdPause?.title || "this advertisement"}"? The sponsor banner will go live immediately inside page flows, and its duration will be extended by the time it was paused.`
+        }
+        confirmLabel={pendingAdPause?.status === "active" ? "Pause Campaign" : "Resume Campaign"}
+        cancelLabel="Go Back"
+        kicker="Campaign Cockpit"
+        busy={busyAction === "Advertisement campaign paused successfully." || busyAction === "Advertisement campaign resumed successfully."}
+        onCancel={() => {
+          if (busyAction !== "Advertisement campaign paused successfully." && busyAction !== "Advertisement campaign resumed successfully.") {
+            setPendingAdPause(null);
+          }
+        }}
+        onConfirm={async () => {
+          if (!pendingAdPause?._id) return;
+          const targetAd = pendingAdPause;
+          setPendingAdPause(null);
+          
+          const isPausing = targetAd.status === "active";
+          await handleAction(async () => {
+            await http.patch(`/ads/${targetAd._id}/toggle-pause`);
+            await refreshAdminData();
+          }, isPausing ? "Advertisement campaign paused successfully." : "Advertisement campaign resumed successfully.");
+        }}
+      />
+
+      <ConfirmActionModal
+        open={pendingPauseAllAds}
+        title="Pause All Running Advertisements"
+        description="Are you sure you want to pause ALL active running advertisements? This will temporarily suspend all sponsor campaigns on the platform and set them to expired."
+        confirmLabel="Pause All Active Campaigns"
+        cancelLabel="Cancel"
+        kicker="Emergency Pause Cockpit"
+        busy={busyAction === "All running advertisements paused."}
+        onCancel={() => {
+          if (busyAction !== "All running advertisements paused.") {
+            setPendingPauseAllAds(false);
+          }
+        }}
+        onConfirm={async () => {
+          setPendingPauseAllAds(false);
+          await pauseAllActiveAds();
+        }}
+      />
+
       <ConfirmActionModal
         open={Boolean(pendingAdDelete)}
         title="Delete advertisement"
@@ -6322,13 +8434,156 @@ export const DashboardPage = () => {
         }}
       />
 
+      {selectedPendingUser && (
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/85 px-4 py-6 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-4xl rounded-[32px] border border-white/10 bg-slate-950 shadow-[0_32px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden max-h-[90vh] animate-[fadeIn_0.3s_ease-out]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between gap-4 border-b border-white/5 p-6 bg-slate-900/40 shrink-0">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-400">Application Review Console</p>
+                <h2 className="mt-1 text-2xl font-black text-white">Review Onboarding Credentials</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPendingUser(null)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 hover:border-white/20 hover:text-white transition duration-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content Scroll Area */}
+            <div className="p-6 md:p-8 overflow-y-auto space-y-6 flex-1 text-xs">
+              <div className="grid gap-6 md:grid-cols-[280px_1fr]">
+                
+                {/* Left Column: Summary */}
+                <div className="flex flex-col items-center text-center bg-slate-900/20 border border-white/5 rounded-2xl p-5">
+                  <div className="relative">
+                    <div className="h-28 w-28 rounded-[28px] overflow-hidden bg-slate-950 border-2 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.25)] flex items-center justify-center">
+                      {selectedPendingUser.profilePhotoUrl || selectedPendingUser.livePhotoUrl ? (
+                        <img src={selectedPendingUser.profilePhotoUrl || selectedPendingUser.livePhotoUrl} alt={selectedPendingUser.fullName} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-3xl font-black text-slate-400">
+                          {selectedPendingUser.fullName ? selectedPendingUser.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "PE"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <h3 className="mt-4 text-base font-extrabold text-white leading-tight">{selectedPendingUser.fullName}</h3>
+                  
+                  <div className="mt-2.5 flex justify-center gap-1.5 flex-wrap">
+                    <span className="rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2.5 py-0.5 text-[8.5px] font-black tracking-wider uppercase">
+                      {String(selectedPendingUser.role || "reporter").replaceAll("_", " ")}
+                    </span>
+                    <span className="rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-0.5 text-[8.5px] font-black tracking-wider uppercase animate-pulse">
+                      Pending Approval
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Column: Key details */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 border-b border-white/5 pb-2">Profile Metadata</h4>
+                  <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                    <DetailRow label="Mobile Phone" value={selectedPendingUser.phone} />
+                    <DetailRow label="Official Email" value={selectedPendingUser.email || "-"} />
+                    <DetailRow label="District Jurisdiction" value={selectedPendingUser.district || "-"} />
+                    <DetailRow label="Block / Area" value={selectedPendingUser.area || "-"} />
+                    <DetailRow label="Blood Group" value={selectedPendingUser.bloodGroup || "O+"} />
+                    <DetailRow label="Education" value={selectedPendingUser.education || "-"} />
+                    <DetailRow label="Aadhaar Number" value={selectedPendingUser.aadhaarNumber || "-"} />
+                    <DetailRow label="Email Verification" value={selectedPendingUser.isEmailVerified ? "Verified" : "Unverified"} valueClassName={selectedPendingUser.isEmailVerified ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"} />
+                  </div>
+                </div>
+              </div>
+
+              {/* KYC Document Previews */}
+              <div className="border-t border-white/5 pt-5 space-y-3">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">KYC Verification Documents</h4>
+                <div className="grid gap-6 sm:grid-cols-2">
+                  {(selectedPendingUser.profilePhotoUrl || selectedPendingUser.livePhotoUrl) && (
+                    <div className="group/kyc relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                      <p className="text-[9px] text-slate-400 font-black mb-2 uppercase tracking-wider">Registered Profile Photo</p>
+                      <div className="h-48 overflow-hidden rounded-xl bg-slate-955 flex items-center justify-center">
+                        <img src={selectedPendingUser.profilePhotoUrl || selectedPendingUser.livePhotoUrl} alt="Profile Scan" className="w-full h-full object-contain transition-transform duration-300 group-hover/kyc:scale-105" />
+                      </div>
+                    </div>
+                  )}
+                  {selectedPendingUser.aadhaarImageUrl && (
+                    <div className="group/kyc relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+                      <p className="text-[9px] text-slate-400 font-black mb-2 uppercase tracking-wider">Aadhaar Card Document (ID Card)</p>
+                      <div className="h-48 overflow-hidden rounded-xl bg-slate-955 flex items-center justify-center">
+                        <img src={selectedPendingUser.aadhaarImageUrl} alt="Aadhaar Scan" className="w-full h-full object-contain transition-transform duration-300 group-hover/kyc:scale-105" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Optional Rejection Feedback input inside the modal */}
+              <div className="border-t border-white/5 pt-5 space-y-2">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Editorial Feedback (For Rejections)</h4>
+                <textarea
+                  className="w-full min-h-[80px] rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 placeholder-slate-500 transition duration-200 resize-none"
+                  placeholder="Optional rejection feedback... Describe corrections needed (e.g. Aadhaar image blurry, details incomplete, etc.)."
+                  value={feedbacks[`user-${selectedPendingUser._id}`] || ""}
+                  onChange={(e) => setFeedbacks({ ...feedbacks, [`user-${selectedPendingUser._id}`]: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Bottom Actions footer bar */}
+            <div className="border-t border-white/5 p-6 bg-slate-900/40 flex flex-wrap justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedPendingUser(null)}
+                className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-white hover:bg-white/5 hover:border-white/20 transition duration-200"
+              >
+                Close Review
+              </button>
+              
+              <button
+                type="button"
+                onClick={async () => {
+                  const targetId = selectedPendingUser._id;
+                  setSelectedPendingUser(null);
+                  setPendingUserRejectId(targetId);
+                }}
+                className="rounded-full bg-rose-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-rose-500 transition duration-200"
+              >
+                Reject Request
+              </button>
+              
+              <button
+                type="button"
+                onClick={async () => {
+                  const targetId = selectedPendingUser._id;
+                  setSelectedPendingUser(null);
+                  await approveUser(targetId);
+                }}
+                className="rounded-full bg-green-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-green-500 transition duration-200"
+              >
+                Approve Onboarding
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       <ConfirmActionModal
         open={Boolean(pendingUserRejectId)}
-        title="Reject reporter application"
-        description="Are you sure you want to reject this reporter application? This will decline their registration credentials and send feedback."
-        confirmLabel="Reject Application"
+        title="Reject credentials / application"
+        description="Are you sure you want to reject this user's credentials? Please specify the detailed reason or corrections required below so they can re-apply."
+        confirmLabel="Reject Credentials"
         cancelLabel="Cancel"
         kicker="Reject Reporter"
+        showInput={true}
+        inputValue={feedbacks[`user-${pendingUserRejectId}`] || ""}
+        onInputChange={(val) => setFeedbacks({ ...feedbacks, [`user-${pendingUserRejectId}`]: val })}
+        inputPlaceholder="Describe the corrections needed (e.g. Aadhaar scan blurry, missing credentials, wrong district, etc.)..."
         busy={busyAction === "User rejected with feedback."}
         onCancel={() => {
           if (busyAction !== "User rejected with feedback.") {
@@ -6459,7 +8714,11 @@ export const DashboardPage = () => {
                               </div>
                             </div>
                             <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
-                              ad.status === "active" ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-slate-500/10 text-slate-400 border border-slate-500/10"
+                              ad.status === "active"
+                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                : ad.status === "paused"
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                : "bg-slate-500/10 text-slate-400 border border-slate-500/10"
                             }`}>
                               {ad.status}
                             </span>
@@ -6475,6 +8734,17 @@ export const DashboardPage = () => {
                           <div className="flex gap-2 justify-end pt-1">
                             <button
                               type="button"
+                              onClick={() => togglePauseInArticleAd(ad)}
+                              className={`rounded-full border px-3 py-1 text-[10px] font-bold transition ${
+                                ad.status === "active"
+                                  ? "bg-amber-600/10 border-amber-500/20 text-amber-400 hover:bg-amber-600 hover:text-white"
+                                  : "bg-emerald-600/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-600 hover:text-white"
+                              }`}
+                            >
+                              {ad.status === "active" ? "Pause" : "Resume"}
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => {
                                 setEditingInArticleAdId(ad._id);
                                 setInArticleAdForm({
@@ -6485,11 +8755,13 @@ export const DashboardPage = () => {
                                   adPosition: ad.adPosition || "middle",
                                   paragraphIndex: ad.paragraphIndex !== undefined ? Number(ad.paragraphIndex) : 2,
                                   durationDays: ad.durationDays || 7,
+                                  amount: ad.amount || 0,
                                   priority: ad.priority || 10,
                                   ctaLabel: ad.ctaLabel || "Visit Sponsor",
                                   description: ad.description || "",
                                   notes: ad.notes || "",
                                   status: ad.status || "active",
+                                  articleId: ad.articleId || "",
                                 });
                                 setShowInArticleAdCreateForm(true);
                               }}
@@ -6641,6 +8913,17 @@ export const DashboardPage = () => {
                                 onChange={(e) => setInArticleAdForm({ ...inArticleAdForm, priority: Number(e.target.value) })}
                               />
                             </div>
+                             <div className="space-y-1">
+                               <label className="text-[10px] font-semibold uppercase text-slate-555">Pricing (INR) <span className="text-[9px] text-orange-400 font-bold">(Auto)</span></label>
+                               <input
+                                 type="number"
+                                 min={0}
+                                 className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-450 focus:outline-none cursor-not-allowed"
+                                 placeholder="0"
+                                 value={inArticleAdForm.amount}
+                                 readOnly
+                               />
+                             </div>
                           </div>
 
                           {/* Description */}
@@ -7003,7 +9286,7 @@ export const DashboardPage = () => {
                       value={adForm.placement}
                       onChange={(event) => setAdForm({ ...adForm, placement: event.target.value })}
                     >
-                      {adPlacements.map((p) => (
+                      {adPlacements.filter((p) => p.value !== "in-article").map((p) => (
                         <option key={p.value} value={p.value}>{p.label}</option>
                       ))}
                     </select>
@@ -7036,13 +9319,13 @@ export const DashboardPage = () => {
                     {adErrors.durationDays && <p className="text-[9px] text-rose-450 font-bold leading-tight">{adErrors.durationDays}</p>}
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Price (INR)</label>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 font-semibold">Price (INR) <span className="text-[9px] text-orange-400 font-bold">(Auto)</span></label>
                     <input
                       type="number"
                       min="0"
-                      className={`w-full rounded-2xl border ${adErrors.amount ? 'border-rose-500 bg-rose-500/5' : 'border-white/10 bg-white/5'} px-3 py-3 text-sm text-white focus:outline-none`}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-3 text-sm text-slate-450 focus:outline-none cursor-not-allowed"
                       value={adForm.amount}
-                      onChange={(event) => setAdForm({ ...adForm, amount: Number(event.target.value) })}
+                      readOnly
                     />
                     {adErrors.amount && <p className="text-[9px] text-rose-450 font-bold leading-tight">{adErrors.amount}</p>}
                   </div>
@@ -7069,6 +9352,225 @@ export const DashboardPage = () => {
                     onChange={(event) => setAdForm({ ...adForm, notes: event.target.value })}
                   />
                 </div>
+
+                {adForm.placement === "promotional-article" && (
+                  <div className="space-y-4 rounded-2xl border border-dashed border-emerald-500/20 bg-emerald-500/5 p-4 mt-2">
+                    <p className="text-xs font-semibold text-emerald-450 uppercase tracking-wider">Promotional Article Parameters</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Target District</label>
+                        <select
+                          className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-2.5 text-xs text-white focus:outline-none"
+                          value={adForm.district || "Palamu"}
+                          onChange={(e) => setAdForm({ ...adForm, district: e.target.value, block: jharkhandBlocksByDistrict[e.target.value]?.[0] || "" })}
+                        >
+                          {jharkhandDistricts.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Target Block / Area</label>
+                        <select
+                          className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-2.5 text-xs text-white focus:outline-none"
+                          value={adForm.block || "Medininagar"}
+                          onChange={(e) => setAdForm({ ...adForm, block: e.target.value })}
+                        >
+                          {(jharkhandBlocksByDistrict[adForm.district || "Palamu"] || []).map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Full Article Body Content</label>
+                      <textarea
+                        className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+                        rows={6}
+                        placeholder="Write the full press release, event details, or promotional copy here..."
+                        value={adForm.promotionalContent || ""}
+                        onChange={(event) => setAdForm({ ...adForm, promotionalContent: event.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {adForm.placement === "homepage-popup" && (
+                  <div className="space-y-4 rounded-2xl border border-dashed border-orange-500/20 bg-orange-500/5 p-4 mt-2">
+                    <p className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Premium Pop-up Targeting & Geofencing</p>
+                    
+                    {/* Time Slotting active hours */}
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Hourly Running Slots (Active Hours)</label>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className="block text-[9px] text-slate-500 uppercase tracking-wider">Start Hour (24h format)</label>
+                          <select
+                            className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-2.5 text-xs text-white focus:outline-none"
+                            value={adForm.timeTargeting?.startHour ?? 0}
+                            onChange={(e) => setAdForm({
+                              ...adForm,
+                              timeTargeting: {
+                                ...(adForm.timeTargeting || { startHour: 0, endHour: 24 }),
+                                startHour: Number(e.target.value)
+                              }
+                            })}
+                          >
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <option key={i} value={i}>
+                                {i === 0 ? "12:00 AM (00)" : i === 12 ? "12:00 PM (12)" : i > 12 ? `${i - 12}:00 PM (${i})` : `${i}:00 AM (${i})`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[9px] text-slate-500 uppercase tracking-wider">End Hour (24h format)</label>
+                          <select
+                            className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-2.5 text-xs text-white focus:outline-none"
+                            value={adForm.timeTargeting?.endHour ?? 24}
+                            onChange={(e) => setAdForm({
+                              ...adForm,
+                              timeTargeting: {
+                                ...(adForm.timeTargeting || { startHour: 0, endHour: 24 }),
+                                endHour: Number(e.target.value)
+                              }
+                            })}
+                          >
+                            {Array.from({ length: 25 }, (_, i) => i > 0 && (
+                              <option key={i} value={i}>
+                                {i === 12 ? "12:00 PM (12)" : i === 24 ? "11:59 PM (24)" : i > 12 ? `${i - 12}:00 PM (${i})` : `${i}:00 AM (${i})`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Geofencing Districts */}
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 font-semibold">District Geofencing</label>
+                      <div className="flex gap-2">
+                        <select
+                          className="flex-1 rounded-2xl border border-white/10 bg-slate-900 px-4 py-2.5 text-xs text-white focus:outline-none"
+                          value={districtInput}
+                          onChange={(e) => {
+                            setDistrictInput(e.target.value);
+                            setBlockInput("");
+                          }}
+                        >
+                          {jharkhandDistricts.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (districtInput && !adForm.targetDistricts?.includes(districtInput)) {
+                              setAdForm({
+                                ...adForm,
+                                targetDistricts: [...(adForm.targetDistricts || []), districtInput]
+                              });
+                            }
+                          }}
+                          className="rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition-all"
+                        >
+                          + Add District
+                        </button>
+                      </div>
+                      
+                      {/* District badges */}
+                      {adForm.targetDistricts?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 pt-1.5">
+                          {adForm.targetDistricts.map((d) => (
+                            <span key={d} className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 text-[10px] font-bold text-orange-400">
+                              {d}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAdForm({
+                                    ...adForm,
+                                    targetDistricts: adForm.targetDistricts.filter(dist => dist !== d),
+                                    targetBlocks: (adForm.targetBlocks || []).filter(blk => !jharkhandBlocksByDistrict[d]?.includes(blk))
+                                  });
+                                }}
+                                className="text-orange-400 hover:text-white ml-0.5 text-[10px]"
+                              >
+                                <X size={10} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-500 italic">No districts targeted. Showing in all districts by default (Broadcast mode).</p>
+                      )}
+                    </div>
+
+                    {/* Geofencing Blocks */}
+                    {adForm.targetDistricts?.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-white/5">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 font-semibold">Block / Sub-District Geofencing (Optional)</label>
+                        <p className="text-[10px] text-slate-500">Fine-tune targeting inside selected districts. Leave empty to target all blocks in those districts.</p>
+                        <div className="flex gap-2">
+                          <select
+                            className="flex-1 rounded-2xl border border-white/10 bg-slate-900 px-4 py-2.5 text-xs text-white focus:outline-none"
+                            value={blockInput}
+                            onChange={(e) => setBlockInput(e.target.value)}
+                          >
+                            <option value="">-- Select Block --</option>
+                            {adForm.targetDistricts.flatMap((dist) =>
+                              (jharkhandBlocksByDistrict[dist] || []).map((blk) => (
+                                <option key={`${dist}_${blk}`} value={blk}>{blk} ({dist})</option>
+                              ))
+                            )}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (blockInput && !adForm.targetBlocks?.includes(blockInput)) {
+                                setAdForm({
+                                  ...adForm,
+                                  targetBlocks: [...(adForm.targetBlocks || []), blockInput]
+                                });
+                              }
+                            }}
+                            disabled={!blockInput}
+                            className="rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-white transition-all"
+                          >
+                            + Add Block
+                          </button>
+                        </div>
+                        
+                        {/* Block badges */}
+                        {adForm.targetBlocks?.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 pt-1.5">
+                            {adForm.targetBlocks.map((b) => {
+                              const parentDistrict = adForm.targetDistricts.find(d => jharkhandBlocksByDistrict[d]?.includes(b)) || "";
+                              return (
+                                <span key={b} className="inline-flex items-center gap-1 rounded-full bg-slate-800 border border-white/10 px-2.5 py-0.5 text-[10px] font-medium text-slate-300">
+                                  {b} {parentDistrict && `(${parentDistrict})`}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAdForm({
+                                        ...adForm,
+                                        targetBlocks: adForm.targetBlocks.filter(blk => blk !== b)
+                                      });
+                                    }}
+                                    className="text-slate-400 hover:text-white ml-0.5 text-[10px]"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-slate-500 italic">No specific blocks targeted. Targeting all areas in the selected districts.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </form>
 
@@ -7391,6 +9893,10 @@ export const DashboardPage = () => {
                 <FileText size={18} />
                 My Articles
               </button>
+              <button onClick={() => { setActiveTab("press_credentials"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "press_credentials" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <IdCard size={18} />
+                Press Documents
+              </button>
               <button onClick={() => { setActiveTab("archive_logs"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "archive_logs" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
                 <FolderKanban size={18} />
                 Chronological Logs
@@ -7428,6 +9934,10 @@ export const DashboardPage = () => {
               <button onClick={() => { setActiveTab("my_stories"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "my_stories" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
                 <FileText size={18} />
                 My Articles
+              </button>
+              <button onClick={() => { setActiveTab("press_credentials"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "press_credentials" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                <IdCard size={18} />
+                Press Documents
               </button>
               <button onClick={() => { setActiveTab("support_desk"); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${activeTab === "support_desk" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
                 <Inbox size={18} />
@@ -7482,6 +9992,15 @@ export const DashboardPage = () => {
           </div>
           
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              className="rounded-full border border-white/10 p-2 text-slate-300 transition hover:bg-white/5 active:scale-95 shadow-sm"
+              onClick={onToggleDarkMode}
+              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+
             <span className="rounded-full bg-orange-500/15 border border-orange-500/30 px-3 py-1 text-xs font-bold text-orange-300 uppercase tracking-widest">
               {String(profile?.role || user?.role || "staff").replaceAll("_", " ")}
             </span>
@@ -7746,6 +10265,7 @@ export const DashboardPage = () => {
               {!dashboardLoading && activeTab === "support_desk" && renderSupportDesk()}
               {!dashboardLoading && activeTab === "credentials" && renderSettings()}
               {!dashboardLoading && activeTab === "analytics" && renderAnalytics()}
+              {!dashboardLoading && activeTab === "press_credentials" && (user?.role === "reporter" || user?.role === "chief_editor") && renderPressCredentials()}
             </>
           )}
         </div>

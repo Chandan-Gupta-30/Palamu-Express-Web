@@ -19,6 +19,13 @@ class AdvertisementDocument extends FirestoreDocument {
     if (this.paragraphIndex === undefined) this.paragraphIndex = 2;
     if (this.viewsCount === undefined) this.viewsCount = 0;
     if (this.clicksCount === undefined) this.clicksCount = 0;
+    if (this.promotionalContent === undefined) this.promotionalContent = "";
+    if (this.district === undefined) this.district = "";
+    if (this.block === undefined) this.block = "";
+    if (this.targetDistricts === undefined) this.targetDistricts = [];
+    if (this.targetBlocks === undefined) this.targetBlocks = [];
+    if (this.timeTargeting === undefined) this.timeTargeting = { startHour: 0, endHour: 24 };
+    if (this.pausedAt === undefined) this.pausedAt = null;
   }
 
   async preSave(rawData) {
@@ -37,6 +44,13 @@ class AdvertisementDocument extends FirestoreDocument {
     if (rawData.paragraphIndex === undefined) rawData.paragraphIndex = 2;
     if (rawData.viewsCount === undefined) rawData.viewsCount = 0;
     if (rawData.clicksCount === undefined) rawData.clicksCount = 0;
+    if (rawData.promotionalContent === undefined) rawData.promotionalContent = "";
+    if (rawData.district === undefined) rawData.district = "";
+    if (rawData.block === undefined) rawData.block = "";
+    if (rawData.targetDistricts === undefined) rawData.targetDistricts = [];
+    if (rawData.targetBlocks === undefined) rawData.targetBlocks = [];
+    if (rawData.timeTargeting === undefined) rawData.timeTargeting = { startHour: 0, endHour: 24 };
+    if (rawData.pausedAt === undefined) rawData.pausedAt = null;
   }
 }
 

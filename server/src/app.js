@@ -54,7 +54,8 @@ export const createApp = (io) => {
       crossOriginResourcePolicy: { policy: "cross-origin" }
     })
   );
-  app.use(express.json({ limit: "10mb" }));
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.use(cookieParser());
   app.use(morgan("dev"));
   app.use(

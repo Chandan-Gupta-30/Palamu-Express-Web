@@ -1,6 +1,12 @@
 import PDFDocument from "pdfkit";
 import { roles } from "./constants.js";
 import { env } from "../config/env.js";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const logoPath = path.join(__dirname, "../assets/logo.png");
 
 const resolvePhotoBuffer = async (user) => {
   const photoUrl =
@@ -79,10 +85,20 @@ export const generateStaffCardBuffer = async (user) => {
     // Header Accent bar
     doc.rect(6, 6, 338, 8).fill("#ea580c");
 
+    // Branded logo with white circle backdrop at the top
+    try {
+      // Draw a solid white circular backdrop to prevent the transparent logo from merging with the dark ID Card background
+      doc.circle(30, 32, 14).fill("#ffffff");
+      // Draw the PNG logo inside it (enlarged to 24x24 px for high visibility)
+      doc.image(logoPath, 18, 20, { width: 24, height: 24 });
+    } catch (err) {
+      console.error("[ID Card Logo Error]:", err.message);
+    }
+
     // Logo & Header text
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(13).text("PALAMU EXPRESS", 16, 22);
-    doc.fillColor("#ea580c").font("Helvetica-Bold").fontSize(8.5).text("DIGITAL MEDIA", 140, 25.5);
-    doc.fillColor("#94a3b8").font("Helvetica").fontSize(7).text("Websites: palamuexpress.com | palamuexpress.in | palamuexpress.live", 16, 39);
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(13).text("PALAMU EXPRESS", 50, 26);
+    doc.fillColor("#ea580c").font("Helvetica-Bold").fontSize(8.5).text("DIGITAL MEDIA", 176, 29.5);
+    doc.fillColor("#94a3b8").font("Helvetica").fontSize(7).text("Websites: palamuexpress.com | palamuexpress.in | palamuexpress.live", 50, 41);
 
     // Divider line
     doc.moveTo(16, 50).lineTo(334, 50).lineWidth(1).stroke("#1e293b");
@@ -130,7 +146,7 @@ export const generateStaffCardBuffer = async (user) => {
     doc.moveTo(16, 150).lineTo(230, 150).lineWidth(0.5).stroke("#1e293b");
 
     doc.font("Helvetica-BoldOblique").fillColor("#38bdf8").fontSize(9.5).text("Pankaj Kumar Gupta", 16, 158);
-    doc.font("Helvetica").fillColor("#64748b").fontSize(6.5).text("AUTHORIZED SIGNATORY", 16, 171);
+    doc.font("Helvetica").fillColor("#64748b").fontSize(6.5).text("Founder & Managing Director", 16, 171);
 
     // Footer Ribbon
     doc.rect(6, 186, 338, 28).fill("#1e293b");
@@ -206,7 +222,7 @@ export const generateStaffCardBuffer = async (user) => {
     doc.fillColor("#f8fafc").font("Helvetica-Bold").text(user.bloodGroup || "O+", 230, 108);
 
     doc.font("Helvetica").fillColor("#94a3b8").text("EMERGENCY CALL:", 135, 124);
-    doc.fillColor("#f8fafc").font("Helvetica-Bold").text(user.phone || "-", 230, 124);
+    doc.fillColor("#f8fafc").font("Helvetica-Bold").text("+91 99999 99999", 230, 124);
 
     doc.font("Helvetica").fillColor("#94a3b8").text("OFFICIAL EMAIL:", 135, 140);
     doc.fillColor("#f8fafc").font("Helvetica-Bold").text("desk@palamuexpress.in", 230, 140);

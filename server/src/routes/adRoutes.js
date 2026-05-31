@@ -13,6 +13,8 @@ import {
   getActiveInArticleAds,
   incrementAdImpression,
   incrementAdClick,
+  pauseAllAdvertisements,
+  toggleAdPause,
 } from "../controllers/adController.js";
 import { authorize, protect } from "../middlewares/auth.js";
 import { roles } from "../utils/constants.js";
@@ -29,6 +31,8 @@ router.post("/:id/click", incrementAdClick);
 
 router.get("/", protect, authorize(roles.SUPER_ADMIN), getAllAdvertisements);
 router.post("/", protect, authorize(roles.SUPER_ADMIN), createAdvertisement);
+router.patch("/pause-all", protect, authorize(roles.SUPER_ADMIN), pauseAllAdvertisements);
+router.patch("/:id/toggle-pause", protect, authorize(roles.SUPER_ADMIN), toggleAdPause);
 router.patch("/:id", protect, authorize(roles.SUPER_ADMIN), updateAdvertisement);
 router.patch("/:id/approve", protect, authorize(roles.SUPER_ADMIN), approveAdvertisement);
 router.patch("/:id/reject", protect, authorize(roles.SUPER_ADMIN), rejectAdvertisement);

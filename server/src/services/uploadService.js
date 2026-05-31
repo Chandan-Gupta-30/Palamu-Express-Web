@@ -15,6 +15,7 @@ const getExtension = (mimeType) => {
     "audio/webm": "webm",
     "audio/x-m4a": "m4a",
     "audio/m4a": "m4a",
+    "application/pdf": "pdf",
   };
   return map[mimeType] || "bin";
 };

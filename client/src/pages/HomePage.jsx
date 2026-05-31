@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Headphones, X } from "lucide-react";
+import { CalendarDays, Headphones, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { http } from "../api/http";
 import { AudioStoryPlayer } from "../components/audio/AudioStoryPlayer";
 import { NewsCard, NewsCardSkeleton } from "../components/news/NewsCard";
+import { useAuth } from "../context/AuthContext";
 import { WhatsAppIcon } from "../components/news/WhatsAppIcon";
+import { WeatherWidget } from "../components/dashboard/WeatherWidget";
+import { CricketWidget } from "../components/dashboard/CricketWidget";
 import { getArticleAuthorName, getArticlePublishedLabel, getWhatsAppShareLink } from "../utils/articles";
 import { newsCategories, newsCategoryLabels } from "../data/districts";
 
@@ -38,31 +41,50 @@ const groupAdsByPlacement = (ads) =>
     { "homepage-hero": [], "homepage-latest": [], "homepage-district": [] }
   );
 
-const AdCard = ({ ad, compact = false }) => (
-  <a
-    href={ad.targetUrl || undefined}
-    target={ad.targetUrl ? "_blank" : undefined}
-    rel={ad.targetUrl ? "noreferrer" : undefined}
-    className={`ad-card group block overflow-hidden rounded-3xl border border-orange-400/20 bg-gradient-to-br from-orange-500/10 via-slate-900 to-slate-950 ${compact ? "h-full" : ""}`}
-  >
-    {ad.imageUrl ? (
-      <div className={compact ? "aspect-[16/10] overflow-hidden bg-slate-950/60 p-3" : "aspect-[16/9] overflow-hidden bg-slate-950/60 p-4"}>
-        <img src={ad.imageUrl} alt={ad.title} className="h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.02]" />
+const getAbsoluteUrl = (url) => {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("/") || trimmed.startsWith("#")) {
+    return trimmed;
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+};
+
+const AdCard = ({ ad, compact = false }) => {
+  const resolvedUrl = ad.targetUrl ? getAbsoluteUrl(ad.targetUrl) : "/advertise-with-us";
+  const ctaText = ad.targetUrl ? (ad.ctaLabel || "Visit Sponsor") : "Advertise With Us";
+  const isExternal = ad.targetUrl && !ad.targetUrl.trim().startsWith("/");
+
+  return (
+    <a
+      href={resolvedUrl || undefined}
+      target={isExternal ? "_blank" : undefined}
+      rel={isExternal ? "noreferrer" : undefined}
+      className={`ad-card group block overflow-hidden rounded-3xl border border-orange-400/20 bg-gradient-to-br from-orange-500/10 via-slate-900 to-slate-950 ${compact ? "h-full" : ""}`}
+    >
+      {ad.imageUrl ? (
+        <div className={compact ? "aspect-[16/10] overflow-hidden bg-slate-950/60 p-3" : "aspect-[16/9] overflow-hidden bg-slate-950/60 p-4"}>
+          <img src={ad.imageUrl} alt={ad.title} className="h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.02]" />
+        </div>
+      ) : null}
+      <div className="space-y-3 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="ad-card-pill rounded-full bg-orange-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-orange-200">
+            Sponsored
+          </span>
+          <span className="ad-card-meta text-xs text-slate-400">Priority {ad.priority}</span>
+        </div>
+        <h3 className="ad-card-title text-lg font-semibold text-white">{ad.title}</h3>
+        {ad.description ? <p className="ad-card-description text-sm leading-6 text-slate-300">{ad.description}</p> : null}
+        <span className="ad-card-cta inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900">{ctaText}</span>
       </div>
-    ) : null}
-    <div className="space-y-3 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <span className="ad-card-pill rounded-full bg-orange-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-orange-200">
-          Sponsored
-        </span>
-        <span className="ad-card-meta text-xs text-slate-400">Priority {ad.priority}</span>
-      </div>
-      <h3 className="ad-card-title text-lg font-semibold text-white">{ad.title}</h3>
-      {ad.description ? <p className="ad-card-description text-sm leading-6 text-slate-300">{ad.description}</p> : null}
-      <span className="ad-card-cta inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900">{ad.targetUrl ? ad.ctaLabel || "Visit Sponsor" : "Banner Only"}</span>
-    </div>
-  </a>
-);
+    </a>
+  );
+};
 
 const StoryImage = ({ src, alt, className = "" }) => (
   <div className={`flex items-center justify-center overflow-hidden rounded-3xl bg-slate-950/40 ${className}`}>
@@ -111,8 +133,13 @@ const CLIENT_CACHE_TTL = 30 * 1000;
 const CLIENT_ADS_TTL = 60 * 1000;
 
 export const HomePage = () => {
+  const { user } = useAuth();
   const [feed, setFeed] = useState(initialFeed);
   const [ads, setAds] = useState([]);
+  const [activePopupAd, setActivePopupAd] = useState(null);
+  const [popupDisplayMode, setPopupDisplayMode] = useState("weighted_random");
+  const [popupAdsList, setPopupAdsList] = useState([]);
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const [selectedDate, setSelectedDate] = useState("");
   const [latestPage, setLatestPage] = useState(1);
   const [feedLoading, setFeedLoading] = useState(false);
@@ -168,20 +195,73 @@ export const HomePage = () => {
 
   useEffect(() => {
     const now = Date.now();
+    const handleActivePopup = (activeAds, displayMode = "weighted_random") => {
+      const popupAds = activeAds.filter(ad => ad.placement === "homepage-popup");
+      if (!popupAds.length) return;
+
+      setPopupDisplayMode(displayMode);
+
+      if (displayMode === "loop_carousel") {
+        if (!sessionStorage.getItem("dismissed_popup_carousel")) {
+          setPopupAdsList(popupAds);
+          setActivePopupAd(popupAds[0]);
+          setCarouselIndex(0);
+          popupAds.forEach(p => {
+            http.post(`/ads/${p._id}/impression`).catch(() => {});
+          });
+        }
+      } else if (displayMode === "sequence") {
+        const sequenceStr = sessionStorage.getItem("popup_sequence_index") || "0";
+        const sequenceIndex = parseInt(sequenceStr, 10);
+        const popup = popupAds[sequenceIndex % popupAds.length];
+        
+        sessionStorage.setItem("popup_sequence_index", String(sequenceIndex + 1));
+        
+        if (popup && !sessionStorage.getItem(`dismissed_popup_${popup._id}`)) {
+          setActivePopupAd(popup);
+          http.post(`/ads/${popup._id}/impression`).catch(() => {});
+        }
+      } else {
+        const popup = popupAds[0];
+        if (popup && !sessionStorage.getItem(`dismissed_popup_${popup._id}`)) {
+          setActivePopupAd(popup);
+          http.post(`/ads/${popup._id}/impression`).catch(() => {});
+        }
+      }
+    };
+
     if (clientAdsCache && now - clientAdsTimestamp < CLIENT_ADS_TTL) {
-      setAds(clientAdsCache);
+      setAds(clientAdsCache.ads);
+      handleActivePopup(clientAdsCache.ads, clientAdsCache.popupDisplayMode);
       return;
     }
 
     http
-      .get("/ads/active")
+      .get("/ads/active", { params: { district: user?.district || "" } })
       .then(({ data }) => {
-        clientAdsCache = data.ads;
+        clientAdsCache = { ads: data.ads, popupDisplayMode: data.popupDisplayMode };
         clientAdsTimestamp = now;
         setAds(data.ads);
+        handleActivePopup(data.ads, data.popupDisplayMode);
       })
       .catch(() => {});
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    if (popupDisplayMode !== "loop_carousel" || !popupAdsList.length || !activePopupAd) return undefined;
+
+    const interval = setInterval(() => {
+      setCarouselIndex((current) => (current + 1) % popupAdsList.length);
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [popupDisplayMode, popupAdsList, activePopupAd]);
+
+  useEffect(() => {
+    if (popupDisplayMode === "loop_carousel" && popupAdsList.length > 0) {
+      setActivePopupAd(popupAdsList[carouselIndex]);
+    }
+  }, [carouselIndex, popupAdsList, popupDisplayMode]);
 
   useEffect(() => {
     setLatestPage(1);
@@ -399,6 +479,10 @@ export const HomePage = () => {
         </div>
 
         <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 animate-[fadeIn_0.5s_ease-out]">
+            <WeatherWidget />
+            <CricketWidget />
+          </div>
           <div className="panel p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="section-title">Breaking News</h2>
@@ -676,6 +760,142 @@ export const HomePage = () => {
           </div>
         </div>
       </section>
+
+      {activePopupAd && (() => {
+        const resolvedUrl = activePopupAd.targetUrl ? getAbsoluteUrl(activePopupAd.targetUrl) : "/advertise-with-us";
+        const ctaText = activePopupAd.targetUrl ? (activePopupAd.ctaLabel || "Learn More") : "Advertise With Us";
+        const isExternal = activePopupAd.targetUrl && !activePopupAd.targetUrl.trim().startsWith("/");
+
+        const handleDismiss = () => {
+          if (popupDisplayMode === "loop_carousel") {
+            sessionStorage.setItem("dismissed_popup_carousel", "true");
+            setPopupAdsList([]);
+          } else {
+            sessionStorage.setItem(`dismissed_popup_${activePopupAd._id}`, "true");
+          }
+          setActivePopupAd(null);
+        };
+
+        const handleCtaClick = () => {
+          http.post(`/ads/${activePopupAd._id}/click`).catch(() => {});
+          handleDismiss();
+        };
+
+        return (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md animate-[fadeIn_0.3s_ease-out]">
+            <div className="relative w-full max-w-lg overflow-hidden rounded-[32px] border border-orange-500/30 bg-gradient-to-br from-orange-600/10 via-slate-950 to-slate-950 p-6 shadow-[0_0_80px_rgba(249,115,22,0.15)] flex flex-col items-center text-center space-y-6">
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className="absolute top-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:border-white/20 hover:text-white"
+                aria-label="Close sponsorship popup"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              {/* Kicker */}
+              <span className="rounded-full bg-orange-500/15 px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-orange-300">
+                {popupDisplayMode === "loop_carousel"
+                  ? `Sponsor Spotlight (${carouselIndex + 1}/${popupAdsList.length})`
+                  : "Exclusive Sponsor Spotlight"}
+              </span>
+
+              {/* Banner Image with Carousel Controls */}
+              {activePopupAd.imageUrl && (
+                <div className="relative w-full aspect-[16/10] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2 group">
+                  <a
+                    href={resolvedUrl}
+                    target={isExternal ? "_blank" : undefined}
+                    rel={isExternal ? "noreferrer" : undefined}
+                    onClick={handleCtaClick}
+                    className="block w-full h-full hover:scale-[1.01] transition duration-200"
+                  >
+                    <img
+                      src={activePopupAd.imageUrl}
+                      alt={activePopupAd.title}
+                      className="h-full w-full object-contain transition-all duration-300"
+                    />
+                  </a>
+
+                  {/* Left & Right Slideshow Arrows */}
+                  {popupDisplayMode === "loop_carousel" && popupAdsList.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCarouselIndex((current) => (current - 1 + popupAdsList.length) % popupAdsList.length);
+                        }}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/70 text-white transition hover:bg-slate-900 shadow-md hover:scale-105 active:scale-95"
+                        aria-label="Previous advertisement"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCarouselIndex((current) => (current + 1) % popupAdsList.length);
+                        }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/70 text-white transition hover:bg-slate-900 shadow-md hover:scale-105 active:scale-95"
+                        aria-label="Next advertisement"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Copy */}
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-white tracking-tight">{activePopupAd.title}</h2>
+                {activePopupAd.description && (
+                  <p className="text-sm leading-relaxed text-slate-450 max-w-sm mx-auto">{activePopupAd.description}</p>
+                )}
+              </div>
+
+              {/* Carousel Indicator Dots */}
+              {popupDisplayMode === "loop_carousel" && popupAdsList.length > 1 && (
+                <div className="flex items-center gap-1.5 pt-1">
+                  {popupAdsList.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setCarouselIndex(idx)}
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        idx === carouselIndex ? "w-6 bg-orange-500" : "w-2 bg-white/20 hover:bg-white/40"
+                      }`}
+                      aria-label={`Go to ad campaign ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* CTA controls */}
+              <div className="flex w-full gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleDismiss}
+                  className="flex-1 rounded-full border border-white/10 bg-white/5 py-3 text-xs font-semibold text-white transition hover:bg-white/10"
+                >
+                  No Thanks
+                </button>
+                <a
+                  href={resolvedUrl}
+                  target={isExternal ? "_blank" : undefined}
+                  rel={isExternal ? "noreferrer" : undefined}
+                  onClick={handleCtaClick}
+                  className="flex-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 py-3 text-xs font-bold text-white shadow-lg shadow-orange-500/25 hover:opacity-90 transition text-center flex items-center justify-center"
+                >
+                  {ctaText}
+                </a>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

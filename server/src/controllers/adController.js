@@ -5,6 +5,7 @@ import { adDurationOptions, adPlacementPricing, adPlacements, adStatuses } from 
 import { createAdOrder, verifyRazorpayPaymentSignature } from "../services/paymentService.js";
 import { uploadBase64Asset } from "../services/uploadService.js";
 import { env } from "../config/env.js";
+import { db } from "../config/firebase.js";
 
 const normalizePlacementValue = (placement) => {
   const value = String(placement || "").trim();
@@ -22,27 +23,42 @@ const buildHttpError = (message, statusCode = StatusCodes.BAD_REQUEST) => {
   return error;
 };
 
-const resolvePlacementPricing = (placement) => adPlacementPricing[normalizePlacementValue(placement)] || adPlacementPricing[adPlacements.HOMEPAGE_LATEST];
-
-const buildPlacementDurationPlans = (placement) => {
-  const pricing = resolvePlacementPricing(placement);
-
-  return adDurationOptions.map((days) => ({
-    days,
-    amount: pricing.baseDailyRate * days,
-    label: `${days} Day${days > 1 ? "s" : ""}`,
-    placement,
-    placementLabel: pricing.label,
-    currency: "INR",
-  }));
+const loadDynamicPricing = async () => {
+  const pricing = JSON.parse(JSON.stringify(adPlacementPricing));
+  try {
+    const configSnap = await db.collection("settings").doc("global_config").get();
+    if (configSnap.exists) {
+      const mapping = {
+        "homepage-hero": "adPricing_homepage-hero",
+        "homepage-latest": "adPricing_homepage-latest",
+        "homepage-district": "adPricing_homepage-district",
+        "homepage-popup": "adPricing_homepage-popup",
+        "in-article": "adPricing_in-article",
+        "promotional-article": "adPricing_promotional-article"
+      };
+      
+      Object.entries(mapping).forEach(([placementKey, dbKey]) => {
+        const val = configSnap.get(dbKey);
+        if (val !== undefined && val !== null && val !== "") {
+          pricing[placementKey] = {
+            ...pricing[placementKey],
+            baseDailyRate: Number(val)
+          };
+        }
+      });
+    }
+  } catch (err) {
+    console.error("[loadDynamicPricing] Error loading global config settings:", err.message);
+  }
+  return pricing;
 };
 
-const getPlanForSelection = (placement, durationDays) => {
+const getPlanForSelection = (placement, durationDays, dynamicPricing) => {
   const normalizedPlacement = normalizePlacementValue(placement);
   const days = Number(durationDays || 0);
   if (!adDurationOptions.includes(days)) return null;
 
-  const pricing = resolvePlacementPricing(normalizedPlacement);
+  const pricing = dynamicPricing[normalizedPlacement] || dynamicPricing[adPlacements.HOMEPAGE_LATEST];
   return {
     placement: normalizedPlacement,
     days,
@@ -74,6 +90,12 @@ const normalizeAdvertisementRecord = (ad) => {
     paragraphIndex: record.paragraphIndex !== undefined ? Number(record.paragraphIndex) : 2,
     viewsCount: Number(record.viewsCount || 0),
     clicksCount: Number(record.clicksCount || 0),
+    promotionalContent: record.promotionalContent || "",
+    district: record.district || "",
+    block: record.block || "",
+    targetDistricts: record.targetDistricts || [],
+    targetBlocks: record.targetBlocks || [],
+    timeTargeting: record.timeTargeting || { startHour: 0, endHour: 24 },
   };
 };
 
@@ -97,6 +119,15 @@ const normalizeAdminAdvertisementInput = async (payload = {}, user) => {
   const articleId = String(payload.articleId || "").trim();
   const adPosition = String(payload.adPosition || "middle").trim();
   const paragraphIndex = payload.paragraphIndex !== undefined ? Number(payload.paragraphIndex) : 2;
+  const promotionalContent = String(payload.promotionalContent || "").trim();
+  const district = String(payload.district || "").trim();
+  const block = String(payload.block || "").trim();
+  const targetDistricts = Array.isArray(payload.targetDistricts) ? payload.targetDistricts : [];
+  const targetBlocks = Array.isArray(payload.targetBlocks) ? payload.targetBlocks : [];
+  const timeTargeting = payload.timeTargeting ? {
+    startHour: Number(payload.timeTargeting.startHour ?? 0),
+    endHour: Number(payload.timeTargeting.endHour ?? 24)
+  } : { startHour: 0, endHour: 24 };
 
   if (!title) throw buildHttpError("Advertisement title is required.");
   if (!imageUrl) throw buildHttpError("Please provide a banner image URL or upload an image.");
@@ -128,6 +159,12 @@ const normalizeAdminAdvertisementInput = async (payload = {}, user) => {
     articleId,
     adPosition,
     paragraphIndex,
+    promotionalContent,
+    district,
+    block,
+    targetDistricts,
+    targetBlocks,
+    timeTargeting,
   };
 };
 
@@ -161,6 +198,12 @@ const normalizeAdminAdvertisementUpdateInput = async (payload = {}, user, existi
     articleId: payload.articleId !== undefined ? String(payload.articleId).trim() : (existingAd?.articleId || ""),
     adPosition: payload.adPosition !== undefined ? String(payload.adPosition).trim() : (existingAd?.adPosition || "middle"),
     paragraphIndex: payload.paragraphIndex !== undefined ? Number(payload.paragraphIndex) : (existingAd?.paragraphIndex ?? 2),
+    promotionalContent: payload.promotionalContent !== undefined ? String(payload.promotionalContent).trim() : (existingAd?.promotionalContent || ""),
+    district: payload.district !== undefined ? String(payload.district).trim() : (existingAd?.district || ""),
+    block: payload.block !== undefined ? String(payload.block).trim() : (existingAd?.block || ""),
+    targetDistricts: payload.targetDistricts ?? existingAd?.targetDistricts ?? [],
+    targetBlocks: payload.targetBlocks ?? existingAd?.targetBlocks ?? [],
+    timeTargeting: payload.timeTargeting ?? existingAd?.timeTargeting ?? { startHour: 0, endHour: 24 },
   };
 
   return normalizeAdminAdvertisementInput(resolvedPayload, user);
@@ -179,6 +222,9 @@ const normalizePublicAdvertisementInput = async (payload = {}) => {
   const advertiserPhone = String(payload.advertiserPhone || "").trim();
   const companyName = String(payload.companyName || "").trim();
   const notes = String(payload.notes || "").trim();
+  const promotionalContent = String(payload.promotionalContent || "").trim();
+  const district = String(payload.district || "").trim();
+  const block = String(payload.block || "").trim();
 
   if (!title) throw buildHttpError("Advertisement title is required.");
   if (!imageUrl) throw buildHttpError("Please upload a banner image or paste a banner image URL.");
@@ -192,7 +238,8 @@ const normalizePublicAdvertisementInput = async (payload = {}) => {
     throw buildHttpError("Please enter a valid advertiser email address.");
   }
 
-  const plan = getPlanForSelection(placement, durationDays);
+  const dynamicPricing = await loadDynamicPricing();
+  const plan = getPlanForSelection(placement, durationDays, dynamicPricing);
   if (!plan) {
     throw buildHttpError("Please choose one of the available duration plans.");
   }
@@ -211,6 +258,12 @@ const normalizePublicAdvertisementInput = async (payload = {}) => {
     advertiserPhone,
     companyName,
     notes,
+    promotionalContent,
+    district,
+    block,
+    targetDistricts: [],
+    targetBlocks: [],
+    timeTargeting: { startHour: 0, endHour: 24 },
   };
 };
 
@@ -225,12 +278,20 @@ const buildAdSchedule = (status, durationDays, existingStartsAt) => {
 };
 
 export const getAdvertisementFormOptions = asyncHandler(async (req, res) => {
+  const dynamicPricing = await loadDynamicPricing();
   res.json({
     placements: Object.values(adPlacements),
-    placementPricing: Object.entries(adPlacementPricing).reduce((accumulator, [placement, pricing]) => {
+    placementPricing: Object.entries(dynamicPricing).reduce((accumulator, [placement, pricing]) => {
       accumulator[placement] = {
         ...pricing,
-        durationPlans: buildPlacementDurationPlans(placement),
+        durationPlans: adDurationOptions.map((days) => ({
+          days,
+          amount: pricing.baseDailyRate * days,
+          label: `${days} Day${days > 1 ? "s" : ""}`,
+          placement,
+          placementLabel: pricing.label,
+          currency: "INR",
+        })),
       };
       return accumulator;
     }, {}),
@@ -333,6 +394,27 @@ export const approveAdvertisement = asyncHandler(async (req, res) => {
     throw buildHttpError("Only paid advertisement requests can be approved.");
   }
 
+  let articleId = ad.articleId || "";
+
+  if (ad.placement === "promotional-article" && !articleId) {
+    const { Article } = await import("../models/Article.js");
+    const article = await Article.create({
+      title: ad.title,
+      excerpt: ad.description || ad.title,
+      content: ad.promotionalContent || ad.description || ad.title,
+      coverImageUrl: ad.imageUrl,
+      district: ad.district || "Palamu",
+      area: ad.block || "Medininagar",
+      category: "promotional",
+      status: "published",
+      publishedAt: new Date(),
+      author: ad.advertiser || req.user?._id || "super_admin",
+      storyFormat: "text",
+    });
+    articleId = article._id;
+    ad.articleId = articleId;
+  }
+
   const schedule = buildAdSchedule(adStatuses.ACTIVE, ad.durationDays, new Date());
   ad.status = adStatuses.ACTIVE;
   ad.startsAt = schedule.startsAt;
@@ -343,7 +425,9 @@ export const approveAdvertisement = asyncHandler(async (req, res) => {
   await ad.save();
 
   res.json({
-    message: "Advertisement approved and published on the homepage.",
+    message: ad.placement === "promotional-article" 
+      ? "Promotional article approved and published successfully." 
+      : "Advertisement approved and published on the homepage.",
     ad: normalizeAdvertisementRecord(ad),
   });
 });
@@ -367,6 +451,23 @@ export const rejectAdvertisement = asyncHandler(async (req, res) => {
   });
 });
 
+const selectPriorityWeightedAd = (popupAds) => {
+  const weighted = popupAds.map(ad => {
+    const rawPriority = Number(ad.priority || 10);
+    const weight = Math.max(1, 11 - rawPriority);
+    return { ad, weight };
+  });
+  const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+  let randomPoint = Math.random() * totalWeight;
+  for (const item of weighted) {
+    if (randomPoint < item.weight) {
+      return item.ad;
+    }
+    randomPoint -= item.weight;
+  }
+  return popupAds[0];
+};
+
 export const getActiveAdvertisements = asyncHandler(async (req, res) => {
   const now = new Date();
   await Advertisement.updateMany(
@@ -374,13 +475,70 @@ export const getActiveAdvertisements = asyncHandler(async (req, res) => {
     { status: adStatuses.EXPIRED }
   );
 
-  const ads = await Advertisement.find({
+  const rawAds = await Advertisement.find({
     status: adStatuses.ACTIVE,
     paymentStatus: "paid",
     $or: [{ endsAt: { $gte: now } }, { endsAt: { $exists: false } }, { endsAt: null }],
   }).sort({ priority: 1, createdAt: -1 });
 
-  res.json({ ads: ads.map((ad) => normalizeAdvertisementRecord(ad)) });
+  const districtFilter = req.query.district ? String(req.query.district).trim() : "";
+  const currentHour = new Date().getHours();
+
+  const standardAds = [];
+  const popupAds = [];
+
+  rawAds.forEach(ad => {
+    const record = normalizeAdvertisementRecord(ad);
+    if (record.placement === "homepage-popup") {
+      const matchesGeo = !ad.targetDistricts || !ad.targetDistricts.length || !districtFilter || ad.targetDistricts.includes(districtFilter);
+      const matchesTime = !ad.timeTargeting || (currentHour >= (ad.timeTargeting.startHour ?? 0) && currentHour <= (ad.timeTargeting.endHour ?? 24));
+      if (matchesGeo && matchesTime) {
+        popupAds.push(record);
+      }
+    } else {
+      standardAds.push(record);
+    }
+  });
+
+  // Load global config settings for popups
+  let popupDisplayMode = "weighted_random";
+  let popupLockedAdId = "";
+  try {
+    const configSnap = await db.collection("settings").doc("global_config").get();
+    if (configSnap.exists) {
+      popupDisplayMode = configSnap.get("popupDisplayMode") || "weighted_random";
+      popupLockedAdId = configSnap.get("popupLockedAdId") || "";
+    }
+  } catch (err) {
+    console.error("[getActiveAdvertisements] Error loading global config:", err.message);
+  }
+
+  const finalAds = [...standardAds];
+
+  if (popupAds.length > 0) {
+    if (popupDisplayMode === "locked_single" && popupLockedAdId) {
+      const lockedAd = popupAds.find(ad => String(ad._id) === popupLockedAdId);
+      if (lockedAd) {
+        finalAds.push(lockedAd);
+      } else {
+        const selected = selectPriorityWeightedAd(popupAds);
+        if (selected) finalAds.push(selected);
+      }
+    } else if (popupDisplayMode === "sequence" || popupDisplayMode === "loop_carousel") {
+      // Return ALL active popup ads to client so client handles continuous slide loops
+      finalAds.push(...popupAds);
+    } else {
+      // Default: weighted random selection
+      const selected = selectPriorityWeightedAd(popupAds);
+      if (selected) finalAds.push(selected);
+    }
+  }
+
+  res.json({
+    ads: finalAds,
+    popupDisplayMode,
+    popupLockedAdId
+  });
 });
 
 export const getAllAdvertisements = asyncHandler(async (req, res) => {
@@ -438,12 +596,21 @@ export const getActiveInArticleAds = asyncHandler(async (req, res) => {
   const ads = await Advertisement.find({
     status: adStatuses.ACTIVE,
     placement: "in-article",
-    $or: [
-      { articleId: req.params.articleId },
-      { articleId: "all" },
-      { articleId: "" }
-    ],
-    $or: [{ endsAt: { $gte: now } }, { endsAt: { $exists: false } }, { endsAt: null }],
+    $and: [
+      {
+        $or: [
+          { articleId: req.params.articleId },
+          { articleId: "all" }
+        ]
+      },
+      {
+        $or: [
+          { endsAt: { $gte: now } },
+          { endsAt: { $exists: false } },
+          { endsAt: null }
+        ]
+      }
+    ]
   }).sort({ priority: 1, createdAt: -1 });
 
   res.json({ ads: ads.map((ad) => normalizeAdvertisementRecord(ad)) });
@@ -481,4 +648,61 @@ export const incrementAdClick = asyncHandler(async (req, res) => {
   });
 
   res.json({ message: "Click registered.", clicksCount: ad.clicksCount });
+});
+
+export const pauseAllAdvertisements = asyncHandler(async (req, res) => {
+  await Advertisement.updateMany(
+    { status: adStatuses.ACTIVE },
+    { status: adStatuses.EXPIRED }
+  );
+
+  req.io?.emit("ad:pause-all", { timestamp: new Date() });
+
+  res.json({ message: "All running advertisements have been paused successfully." });
+});
+
+export const toggleAdPause = asyncHandler(async (req, res) => {
+  const ad = await Advertisement.findById(req.params.id);
+
+  if (!ad) {
+    throw buildHttpError("Advertisement not found.", StatusCodes.NOT_FOUND);
+  }
+
+  if (ad.status !== adStatuses.ACTIVE && ad.status !== adStatuses.PAUSED) {
+    throw buildHttpError("Only active or paused advertisements can be toggled.");
+  }
+
+  let nextStatus;
+  let actionMessage = "";
+
+  if (ad.status === adStatuses.ACTIVE) {
+    nextStatus = adStatuses.PAUSED;
+    ad.pausedAt = new Date();
+    actionMessage = "Advertisement paused successfully.";
+  } else {
+    nextStatus = adStatuses.ACTIVE;
+    if (ad.pausedAt && ad.endsAt) {
+      const pauseDuration = new Date().getTime() - new Date(ad.pausedAt).getTime();
+      ad.endsAt = new Date(new Date(ad.endsAt).getTime() + pauseDuration);
+    }
+    ad.pausedAt = null;
+    actionMessage = "Advertisement resumed successfully.";
+  }
+
+  ad.status = nextStatus;
+  await ad.save();
+
+  const normalized = normalizeAdvertisementRecord(ad);
+
+  req.io?.emit("ad:status-update", {
+    adId: String(ad._id),
+    status: ad.status,
+    startsAt: ad.startsAt,
+    endsAt: ad.endsAt,
+  });
+
+  res.json({
+    message: actionMessage,
+    ad: normalized,
+  });
 });

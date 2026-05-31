@@ -29,6 +29,8 @@ export const ActionPopup = ({
   onClose,
   closeLabel = "Close",
   persistent = false,
+  progress,
+  progressLabel,
 }) => {
   if (!open) return null;
 
@@ -59,11 +61,27 @@ export const ActionPopup = ({
           <div className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] ${type === "loading" ? "animate-pulse" : ""}`}>
             <Icon className={`h-7 w-7 ${tone.iconClassName}`} />
           </div>
-          <div>
+          <div className="flex-grow">
             <h2 className="text-2xl font-semibold text-white">{title}</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-300">{message}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">{message}</p>
           </div>
         </div>
+
+        {/* Premium Glowing Progress Bar for Loading States */}
+        {type === "loading" && progress !== undefined && (
+          <div className="mt-6 space-y-2 rounded-2xl bg-white/[0.02] border border-white/5 p-4 animate-[fadeIn_0.3s_ease-out]">
+            <div className="flex items-center justify-between text-[11px] font-bold tracking-wide text-orange-400">
+              <span className="uppercase tracking-[0.1em]">{progressLabel || "Accredited Action Progress"}</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-900 shadow-inner">
+              <div 
+                className="h-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 transition-all duration-300 ease-out shadow-[0_0_8px_#f97316]"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {!persistent && onClose ? (
           <button

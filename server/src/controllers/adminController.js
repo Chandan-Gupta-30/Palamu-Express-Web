@@ -64,12 +64,38 @@ export const getDashboardPayload = asyncHandler(async (req, res) => {
   };
   const { start, end } = getDayRange(todayStr);
 
-  // Fetch Global Expiry settings
+  // Fetch Global Expiry & Ad Pricing settings
   let globalIdCardExpiry = "";
+  let popupDisplayMode = "weighted_random";
+  let popupLockedAdId = "";
+  const adPricing = {
+    "adPricing_homepage-hero": 699,
+    "adPricing_homepage-latest": 499,
+    "adPricing_homepage-district": 299,
+    "adPricing_homepage-popup": 999,
+    "adPricing_in-article": 199,
+    "adPricing_promotional-article": 199
+  };
   try {
     const configSnap = await db.collection("settings").doc("global_config").get();
     if (configSnap.exists) {
       globalIdCardExpiry = configSnap.get("globalIdCardExpiry") || "";
+      popupDisplayMode = configSnap.get("popupDisplayMode") || "weighted_random";
+      popupLockedAdId = configSnap.get("popupLockedAdId") || "";
+      const pricingKeys = [
+        "adPricing_homepage-hero",
+        "adPricing_homepage-latest",
+        "adPricing_homepage-district",
+        "adPricing_homepage-popup",
+        "adPricing_in-article",
+        "adPricing_promotional-article"
+      ];
+      pricingKeys.forEach(key => {
+        const val = configSnap.get(key);
+        if (val !== undefined && val !== null && val !== "") {
+          adPricing[key] = Number(val);
+        }
+      });
     }
   } catch (err) {
     console.error("[getDashboardPayload] Error loading global config settings:", err.message);
@@ -137,7 +163,10 @@ export const getDashboardPayload = asyncHandler(async (req, res) => {
       contactMessages,
       myArticles,
       publishedArchiveArticles,
-      globalIdCardExpiry
+      globalIdCardExpiry,
+      popupDisplayMode,
+      popupLockedAdId,
+      ...adPricing
     });
     return;
   }
@@ -186,14 +215,17 @@ export const getDashboardPayload = asyncHandler(async (req, res) => {
       pendingArticles,
       myArticles,
       publishedArchiveArticles,
-      globalIdCardExpiry
+      globalIdCardExpiry,
+      popupDisplayMode,
+      popupLockedAdId,
+      ...adPricing
     });
     return;
   }
 
   if (role === roles.REPORTER) {
     const myArticles = await Article.find({ author: userId }).populate("author", "fullName district area").sort({ createdAt: -1 });
-    res.json({ myArticles, globalIdCardExpiry });
+    res.json({ myArticles, globalIdCardExpiry, ...adPricing });
     return;
   }
 
@@ -205,19 +237,43 @@ export const updateGlobalSettings = asyncHandler(async (req, res) => {
 
   // Only allow Super Admins to modify configuration settings
   if (req.user.role !== roles.SUPER_ADMIN) {
-    return res.status(403).json({ message: "Only the Platform Super Admin can adjust system-wide expiry controls." });
+    return res.status(403).json({ message: "Only the Platform Super Admin can adjust system-wide settings." });
   }
 
-  const { globalIdCardExpiry } = req.body;
+  const updateData = {};
+  if (req.body.globalIdCardExpiry !== undefined) {
+    updateData.globalIdCardExpiry = req.body.globalIdCardExpiry || "";
+  }
+  if (req.body.popupDisplayMode !== undefined) {
+    updateData.popupDisplayMode = req.body.popupDisplayMode || "weighted_random";
+  }
+  if (req.body.popupLockedAdId !== undefined) {
+    updateData.popupLockedAdId = req.body.popupLockedAdId || "";
+  }
 
-  await db.collection("settings").doc("global_config").set({
-    globalIdCardExpiry: globalIdCardExpiry || ""
-  }, { merge: true });
+  const pricingKeys = [
+    "adPricing_homepage-hero",
+    "adPricing_homepage-latest",
+    "adPricing_homepage-district",
+    "adPricing_homepage-popup",
+    "adPricing_in-article",
+    "adPricing_promotional-article"
+  ];
+
+  pricingKeys.forEach(key => {
+    if (req.body[key] !== undefined) {
+      updateData[key] = req.body[key] === "" ? "" : Number(req.body[key]);
+    }
+  });
+
+  if (Object.keys(updateData).length > 0) {
+    await db.collection("settings").doc("global_config").set(updateData, { merge: true });
+  }
 
   res.json({
     success: true,
-    message: "Global ID Card Expiry updated successfully.",
-    globalIdCardExpiry: globalIdCardExpiry || ""
+    message: "Global settings updated successfully.",
+    ...updateData
   });
 });
 

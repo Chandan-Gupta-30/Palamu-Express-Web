@@ -1,34 +1,78 @@
 import React, { useState, useEffect } from "react";
-import { Download, Printer, RefreshCw, ShieldCheck } from "lucide-react";
+import { Download, Printer, RefreshCw, ShieldCheck, Check } from "lucide-react";
+import logo from "../../assets/logo.png";
 
 export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [blobUrl, setBlobUrl] = useState(null);
+  const [downloadBlobUrl, setDownloadBlobUrl] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [downloadStep, setDownloadStep] = useState("");
 
   useEffect(() => {
     if (!cardUrl) return;
-    try {
-      const parts = cardUrl.split(",");
-      const base64Data = parts[1] || parts[0];
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      setBlobUrl(url);
+    let url = null;
+    let downloadUrl = null;
+    let active = true;
 
-      return () => {
-        if (url) {
-          URL.revokeObjectURL(url);
+    const loadPdf = async () => {
+      try {
+        if (cardUrl.startsWith("data:") || !cardUrl.startsWith("http")) {
+          // It's a base64 Data URI
+          const parts = cardUrl.split(",");
+          const base64Data = parts[1] || parts[0];
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "application/pdf" });
+          const downloadBlob = new Blob([byteArray], { type: "application/octet-stream" });
+          url = URL.createObjectURL(blob);
+          downloadUrl = URL.createObjectURL(downloadBlob);
+          if (active) {
+            setBlobUrl(url);
+            setDownloadBlobUrl(downloadUrl);
+          }
+        } else {
+          // It's a remote storage HTTP/HTTPS URL
+          // Fetch the PDF file and convert to a local object URL to allow direct downloads and printing
+          const response = await fetch(cardUrl);
+          const arrayBuffer = await response.arrayBuffer();
+          const byteArray = new Uint8Array(arrayBuffer);
+          const blob = new Blob([byteArray], { type: "application/pdf" });
+          const downloadBlob = new Blob([byteArray], { type: "application/octet-stream" });
+          url = URL.createObjectURL(blob);
+          downloadUrl = URL.createObjectURL(downloadBlob);
+          if (active) {
+            setBlobUrl(url);
+            setDownloadBlobUrl(downloadUrl);
+          }
         }
-      };
-    } catch (e) {
-      console.error("Failed to generate Blob URL for ID card", e);
-    }
+      } catch (e) {
+        console.error("Failed to generate Blob URL for ID card", e);
+        // Fallback: use direct URL
+        if (active) {
+          setBlobUrl(cardUrl);
+          setDownloadBlobUrl(cardUrl);
+        }
+      }
+    };
+
+    loadPdf();
+
+    return () => {
+      active = false;
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
+      if (downloadUrl) {
+        URL.revokeObjectURL(downloadUrl);
+      }
+    };
   }, [cardUrl]);
 
   if (!profile) return null;
@@ -61,8 +105,56 @@ export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
     }
   };
 
+  const handleDownloadClick = (e) => {
+    e.preventDefault();
+    if (!downloadBlobUrl) return;
+
+    setShowProgress(true);
+    setProgress(0);
+    setDownloadStep("Initializing download...");
+
+    const duration = 1200; // 1.2 seconds total duration
+    const intervalTime = 30; // Update every 30ms
+    const steps = duration / intervalTime;
+    let currentStep = 0;
+
+    const interval = setInterval(() => {
+      currentStep++;
+      const currentProgress = Math.min(Math.round((currentStep / steps) * 100), 100);
+      setProgress(currentProgress);
+
+      if (currentProgress < 30) {
+        setDownloadStep("Securing local credentials...");
+      } else if (currentProgress < 65) {
+        setDownloadStep("Generating digital security keys...");
+      } else if (currentProgress < 90) {
+        setDownloadStep("Compiling PDF layers...");
+      } else {
+        setDownloadStep("Finalizing download...");
+      }
+
+      if (currentProgress >= 100) {
+        clearInterval(interval);
+        setDownloadStep("ID Card Downloaded!");
+        
+        // Trigger download programmatically
+        const a = document.createElement("a");
+        a.href = downloadBlobUrl;
+        a.download = `Palamu_Express_ID_Card_${profile.fullName.replace(/\s+/g, "_")}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Close the modal after a short delay
+        setTimeout(() => {
+          setShowProgress(false);
+        }, 1000);
+      }
+    }, intervalTime);
+  };
+
   return (
-    <div className="panel p-6 flex flex-col items-center justify-between h-full min-h-[480px]">
+    <div className="panel p-6 flex flex-col items-center justify-start gap-4 h-auto">
       {/* Cursive Google Font for Signatures */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&display=swap');
@@ -85,7 +177,7 @@ export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
           width: 100%;
           height: 100%;
           backface-visibility: hidden;
-          border-radius: 10px;
+          border-radius: 16px;
           overflow: hidden;
           box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
@@ -108,7 +200,7 @@ export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
 
       {/* 3D Flippable Card Container */}
       <div 
-        className="card-perspective my-auto cursor-pointer"
+        className="card-perspective my-2 cursor-pointer"
         onClick={() => setIsFlipped(!isFlipped)}
         title="Click to Flip Card"
       >
@@ -120,14 +212,19 @@ export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
             <div className="h-2 bg-orange-600 w-full" />
             
             {/* Logo and Subtext */}
-            <div className="px-4 pt-2.5 flex items-center justify-between">
-              <div>
-                <span className="text-white font-extrabold text-sm tracking-tight">PALAMU EXPRESS</span>
-                <span className="text-orange-500 font-extrabold text-[10px] tracking-normal ml-1">DIGITAL MEDIA</span>
+            <div className="px-4 pt-2.5 flex items-center gap-2.5">
+              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center p-0.5 shrink-0 shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
+                <img src={logo} alt="Palamu Express Logo" className="w-full h-full object-contain" />
               </div>
-            </div>
-            <div className="px-4 text-[7px] text-slate-400 tracking-tight leading-none mt-[-2px]">
-              Websites: palamuexpress.com | palamuexpress.in | palamuexpress.live
+              <div className="flex flex-col">
+                <div className="flex items-baseline leading-none">
+                  <span className="text-white font-extrabold text-sm tracking-tight">PALAMU EXPRESS</span>
+                  <span className="text-orange-500 font-extrabold text-[10px] tracking-normal ml-1.5">DIGITAL MEDIA</span>
+                </div>
+                <div className="text-[7px] text-slate-400 tracking-tight leading-none mt-1">
+                  Websites: palamuexpress.com | palamuexpress.in | palamuexpress.live
+                </div>
+              </div>
             </div>
 
             {/* Divider */}
@@ -290,16 +387,16 @@ export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
           Flip ID Card
         </button>
         
-        {blobUrl ? (
+        {downloadBlobUrl ? (
           <>
-            <a
-              href={blobUrl}
-              download={`Palamu_Express_ID_Card_${profile.fullName.replace(/\s+/g, "_")}.pdf`}
+            <button
+              type="button"
+              onClick={handleDownloadClick}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-orange-600 text-white hover:bg-orange-500 transition shadow-lg shadow-orange-950/20"
             >
               <Download className="h-3.5 w-3.5" />
               Download PDF
-            </a>
+            </button>
             
             <button
               type="button"
@@ -355,6 +452,47 @@ export const IDCardPreview = ({ profile, cardUrl, globalIdCardExpiry }) => {
           </a>
         </div>
       </div>
+
+      {/* Premium Download Progress Modal */}
+      {showProgress && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-xs flex flex-col items-center gap-4 text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-200">
+            {/* Animated Icon Circle */}
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+              progress >= 100 ? "bg-emerald-500/10 text-emerald-400" : "bg-orange-500/10 text-orange-400"
+            }`}>
+              {progress >= 100 ? (
+                <Check className="h-6 w-6 stroke-[2.5] animate-bounce" />
+              ) : (
+                <Download className="h-6 w-6 stroke-[2.5] animate-pulse" />
+              )}
+            </div>
+
+            {/* Title */}
+            <div className="flex flex-col gap-1">
+              <h4 className="text-sm font-semibold text-white">
+                {progress >= 100 ? "Download Complete" : "Downloading ID Card"}
+              </h4>
+              <span className="text-[10px] font-medium text-slate-400 min-h-[14px]">
+                {downloadStep}
+              </span>
+            </div>
+
+            {/* Progress Bar & Percent */}
+            <div className="w-full flex flex-col items-center gap-2">
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-orange-600 to-orange-400 rounded-full transition-all duration-100 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-xs font-mono font-bold text-orange-400">
+                {progress}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

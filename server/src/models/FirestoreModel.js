@@ -134,6 +134,17 @@ class FirestoreQuery {
                   nextData[k] = Array.isArray(nextData[k]) ? [...nextData[k], v] : [v];
                 }
               }
+              if (update.$addToSet) {
+                for (const [k, v] of Object.entries(update.$addToSet)) {
+                  if (Array.isArray(nextData[k])) {
+                    if (!nextData[k].some(item => String(item) === String(v))) {
+                      nextData[k] = [...nextData[k], v];
+                    }
+                  } else {
+                    nextData[k] = [v];
+                  }
+                }
+              }
               if (update.$pull) {
                 for (const [k, v] of Object.entries(update.$pull)) {
                   if (Array.isArray(nextData[k])) {

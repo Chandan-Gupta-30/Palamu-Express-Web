@@ -23,6 +23,7 @@ export const adStatuses = {
   PENDING_PAYMENT: "pending_payment",
   PENDING_APPROVAL: "pending_approval",
   ACTIVE: "active",
+  PAUSED: "paused",
   EXPIRED: "expired",
   REJECTED: "rejected",
 };
@@ -31,7 +32,9 @@ export const adPlacements = {
   HOMEPAGE_HERO: "homepage-hero",
   HOMEPAGE_LATEST: "homepage-latest",
   HOMEPAGE_DISTRICT: "homepage-district",
+  HOMEPAGE_POPUP: "homepage-popup",
   IN_ARTICLE: "in-article",
+  PROMOTIONAL_ARTICLE: "promotional-article",
 };
 
 export const adDurationOptions = [1, 3, 7, 15, 30];
@@ -45,17 +48,27 @@ export const adPlacementPricing = {
   [adPlacements.HOMEPAGE_LATEST]: {
     baseDailyRate: 499,
     label: "Latest Updates Sponsor Grid",
-    shortLabel: "Latest Update Sponsor Section",
+    shortLabel: "Latest Update Sponsor Grid",
   },
   [adPlacements.HOMEPAGE_HERO]: {
     baseDailyRate: 699,
     label: "Homepage Hero Rail",
     shortLabel: "Homepage Hero Rail",
   },
+  [adPlacements.HOMEPAGE_POPUP]: {
+    baseDailyRate: 999,
+    label: "Homepage Premium Pop-up Ad",
+    shortLabel: "Homepage Pop-up Modal",
+  },
   [adPlacements.IN_ARTICLE]: {
     baseDailyRate: 199,
     label: "In-Article Sponsor Injection",
     shortLabel: "In-Article Injection",
+  },
+  [adPlacements.PROMOTIONAL_ARTICLE]: {
+    baseDailyRate: 199,
+    label: "Promotional Launch Article",
+    shortLabel: "Promotional Launch Article",
   },
 };
 
@@ -125,6 +138,7 @@ export const articleCategories = {
   SPORTS: "sports",
   BUSINESS: "business",
   TECHNOLOGY: "technology",
+  COMMUNITY: "community",
   OTHER: "other",
 };
 
@@ -140,6 +154,7 @@ export const articleCategoryLabels = {
   sports: "Sports",
   business: "Business",
   technology: "Technology",
+  community: "Community & Panchayat Meetings",
   other: "Other",
 };
 

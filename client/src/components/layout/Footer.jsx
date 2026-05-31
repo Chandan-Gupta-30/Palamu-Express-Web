@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { jharkhandDistricts } from "../../data/districts";
+import logo from "../../assets/logo.png";
 
 const quickLinks = [
   { label: "Home", to: "/" },
@@ -18,11 +19,20 @@ export const Footer = () => (
     <div className="mx-auto max-w-7xl px-4 py-12">
       <div className="grid gap-8 border-b border-white/10 pb-10 lg:grid-cols-[1.4fr_0.9fr_1fr_1fr]">
         <div className="space-y-4">
-          <div className="inline-flex items-center gap-3">
-            <div className="rounded-2xl bg-orange-500 px-3 py-2 text-sm font-bold text-white">PE</div>
+          <div className="inline-flex items-center gap-4">
+            <div className="rounded-2xl bg-white px-2 py-1 shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-[1.02] border border-white/10">
+              <img
+                src={logo}
+                alt="Palamu Express Logo"
+                className="h-16 md:h-21 w-auto object-contain transition-transform duration-300"
+              />
+            </div>
             <div>
-              <h3 className="font-display text-2xl text-white">Palamu Express</h3>
-              <p className="text-sm text-slate-500">Jharkhand-focused digital newsroom</p>
+              <h3 className="font-display text-2xl font-bold text-white leading-none">Palamu Express</h3>
+              <p className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-orange-400 mt-2 leading-none">
+                Voice of Jharkhand
+              </p>
+              <p className="text-xs text-slate-500 mt-2 font-medium">Jharkhand-focused digital newsroom</p>
             </div>
           </div>
           <p className="max-w-xl text-sm leading-7 text-slate-400">

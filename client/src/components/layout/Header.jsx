@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { Menu, Moon, Sun, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import logo from "../../assets/logo.png";
 
 const navLinkClassName = ({ isActive }) =>
   [
@@ -21,11 +22,21 @@ export const Header = ({ darkMode, onToggleDarkMode }) => {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/85 backdrop-blur supports-[backdrop-filter]:bg-slate-950/80">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="rounded-2xl bg-orange-500 px-3 py-2 text-sm font-bold text-white">PE</div>
-          <div>
-            <p className="font-display text-lg text-white sm:text-xl">Palamu Express</p>
-            <p className="hidden text-xs text-slate-500 sm:block">District-first digital newsroom</p>
+        <Link to="/" className="flex items-center gap-3.5 group">
+          <div className="rounded-xl bg-white px-2 py-1 shadow-md transition-all duration-300 group-hover:bg-white/95 group-hover:scale-[1.03] active:scale-95 flex items-center justify-center border border-white/10">
+            <img
+              src={logo}
+              alt="Palamu Express Logo"
+              className="h-11 md:h-13 w-auto object-contain transition-transform duration-300"
+            />
+          </div>
+          <div className="flex flex-col justify-center">
+            <span className="font-display text-base font-bold tracking-tight text-white sm:text-lg transition-colors group-hover:text-orange-400 leading-none">
+              Palamu Express
+            </span>
+            <span className="text-[8px] sm:text-[9.5px] uppercase tracking-[0.24em] text-orange-400 font-bold mt-1.5 leading-none">
+              Voice of Jharkhand
+            </span>
           </div>
         </Link>
 

@@ -7,6 +7,8 @@ import { approvalStatuses, articleStatuses, roles, articleCategories } from "../
 import { generateVoiceDraft, summarizeArticle } from "../services/geminiService.js";
 import { uploadBase64Asset } from "../services/uploadService.js";
 import { env } from "../config/env.js";
+import fs from "fs";
+import path from "path";
 
 const slugify = (value) =>
   value
@@ -374,6 +376,26 @@ export const getArticleSharePreview = asyncHandler(async (req, res) => {
     return res.status(StatusCodes.NOT_FOUND).send("Article not found");
   }
 
+  // Load and cache logo dynamically as base64 to present corporate identity cleanly in preview headers
+  let base64Logo = "";
+  try {
+    const possiblePaths = [
+      path.resolve(process.cwd(), "../client/src/assets/logo.png"),
+      path.resolve(process.cwd(), "client/src/assets/logo.png"),
+      path.resolve(process.cwd(), "src/assets/logo.png"),
+      path.resolve(new URL(import.meta.url).pathname, "../../../client/src/assets/logo.png")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        const buffer = fs.readFileSync(p);
+        base64Logo = `data:image/png;base64,${buffer.toString("base64")}`;
+        break;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load logo for share preview:", err);
+  }
+
   const normalizedClientOrigin = String(env.clientUrl || "").trim().replace(/\/+$/, "");
   const articleUrl = `${normalizedClientOrigin}/article/${article.slug}`;
   const title = escapeHtml(article.title || "Palamu Express");
@@ -384,13 +406,15 @@ export const getArticleSharePreview = asyncHandler(async (req, res) => {
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!doctype html>
-<html lang="en">
+<html lang="hi">
   <head>
     <meta charset="utf-8" />
     <title>${title}</title>
     <meta name="description" content="${description}" />
     <meta name="author" content="${authorName}" />
     <meta name="robots" content="noindex,follow" />
+    
+    <!-- Open Graph (Facebook / WhatsApp / Telegram) -->
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="Palamu Express" />
     <meta property="og:title" content="${title}" />
@@ -399,20 +423,165 @@ export const getArticleSharePreview = asyncHandler(async (req, res) => {
     ${imageUrl ? `<meta property="og:image" content="${escapeHtml(imageUrl)}" />` : ""}
     ${imageUrl ? `<meta property="og:image:secure_url" content="${escapeHtml(imageUrl)}" />` : ""}
     ${imageUrl ? `<meta property="og:image:alt" content="${title}" />` : ""}
+    ${imageUrl ? `<meta property="og:image:width" content="1200" />` : ""}
+    ${imageUrl ? `<meta property="og:image:height" content="630" />` : ""}
     <meta property="article:published_time" content="${new Date(publishedTime).toISOString()}" />
     <meta property="article:author" content="${authorName}" />
+    
+    <!-- Twitter Preview -->
     <meta name="twitter:card" content="${imageUrl ? "summary_large_image" : "summary"}" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${description}" />
     ${imageUrl ? `<meta name="twitter:image" content="${escapeHtml(imageUrl)}" />` : ""}
-    <meta http-equiv="refresh" content="0; url=${escapeHtml(articleUrl)}" />
+    
+    <!-- Meta Refresh redirection with browser script fallback -->
+    <meta http-equiv="refresh" content="2; url=${escapeHtml(articleUrl)}" />
     <link rel="canonical" href="${escapeHtml(articleUrl)}" />
-    <script>
-      window.location.replace(${JSON.stringify(articleUrl)});
-    </script>
+    
+    <style>
+      :root {
+        --brand-orange: #ea580c;
+        --brand-amber: #f59e0b;
+        --bg-slate: #0b0f19;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: radial-gradient(circle at top, #1e293b 0%, var(--bg-slate) 100%);
+        color: #f8fafc;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      .container {
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+      }
+      .logo-badge {
+        display: inline-flex;
+        background: white;
+        padding: 10px 24px;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        margin-bottom: 24px;
+        transition: transform 0.3s ease;
+      }
+      .logo-badge:hover {
+        transform: scale(1.03);
+      }
+      .logo-img {
+        height: 36px;
+        width: auto;
+        display: block;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(16px);
+        border-radius: 28px;
+        padding: 28px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+      .cover-img {
+        width: 100%;
+        aspect-ratio: 16/10;
+        object-fit: cover;
+        border-radius: 20px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .title {
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1.4;
+        margin: 0 0 12px 0;
+        color: white;
+      }
+      .description {
+        font-size: 14px;
+        line-height: 1.6;
+        color: #94a3b8;
+        margin: 0 0 20px 0;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        background: linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-amber) 100%);
+        color: white;
+        border: none;
+        padding: 16px 24px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 20px;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: 0 15px 30px -5px rgba(234, 88, 12, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-sizing: border-box;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 35px -5px rgba(234, 88, 12, 0.45);
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .redirect-msg {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-left-color: var(--brand-orange);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
-    <p>Redirecting to <a href="${escapeHtml(articleUrl)}">${title}</a>...</p>
+    <div class="container">
+      <div class="logo-badge">
+        ${base64Logo ? `<img src="${base64Logo}" alt="Palamu Express" class="logo-img" />` : `<span style="font-weight: 800; color: #ea580c; font-size: 20px;">PALAMU EXPRESS</span>`}
+      </div>
+      
+      <div class="card">
+        ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${title}" class="cover-img" />` : ""}
+        <h1 class="title">${title}</h1>
+        <p class="description">${description}</p>
+        
+        <a href="${escapeHtml(articleUrl)}" class="btn">
+          पूरी खबर हिंदी में पढ़ने के लिए यहाँ क्लिक करें 👉
+        </a>
+      </div>
+      
+      <div class="redirect-msg">
+        <div class="spinner"></div>
+        <span>आपको 2 सेकंड में मुख्य समाचार पृष्ठ पर भेजा जा रहा है...</span>
+      </div>
+    </div>
+
+    <script>
+      setTimeout(function() {
+        window.location.replace(${JSON.stringify(articleUrl)});
+      }, 2000);
+    </script>
   </body>
 </html>`);
 });

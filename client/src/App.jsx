@@ -96,7 +96,7 @@ export default function App() {
           path="/dashboard"
           element={
             <ProtectedRoute allow={canAccessDashboard}>
-              <DashboardPage />
+              <DashboardPage darkMode={darkMode} onToggleDarkMode={() => setDarkMode((value) => !value)} />
             </ProtectedRoute>
           }
         />

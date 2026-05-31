@@ -102,13 +102,25 @@ export const AudioStoryPlayer = ({
     }
   };
 
+  const isCrossOrigin = useMemo(() => {
+    if (!article?.audioUrl) return false;
+    if (article.audioUrl.startsWith("data:") || article.audioUrl.startsWith("blob:")) return false;
+    try {
+      const url = new URL(article.audioUrl);
+      return url.origin !== window.location.origin;
+    } catch (_) {
+      return false;
+    }
+  }, [article?.audioUrl]);
+
   useEffect(() => {
     setLiveWaveform([]);
-    setAnalysisEnabled(true);
+    // Disable Web Audio API analyser for cross-origin URLs to prevent CORS silent audio blocks
+    setAnalysisEnabled(!isCrossOrigin);
     return () => {
       cleanupAudioAnalysis();
     };
-  }, [article?.audioUrl]);
+  }, [article?.audioUrl, isCrossOrigin]);
 
   const togglePlayback = async () => {
     const audio = audioRef.current;
@@ -121,6 +133,9 @@ export const AudioStoryPlayer = ({
     }
 
     try {
+      if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+        await audioContextRef.current.resume();
+      }
       await audio.play();
       setPlaying(true);
     } catch (_) {
@@ -129,11 +144,17 @@ export const AudioStoryPlayer = ({
   };
 
   return (
-    <div className={`rounded-[28px] border border-white/10 bg-white/[0.04] audio-reader-box p-4 ${className}`}>
+    <div className={`rounded-[28px] border transition-all duration-500 audio-reader-box p-4 ${
+      playing 
+        ? "border-emerald-500/30 bg-emerald-500/[0.02] shadow-[0_0_30px_rgba(16,185,129,0.05)]" 
+        : "border-white/10 bg-white/[0.04] shadow-none"
+    } ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
-            <Volume2 size={18} />
+          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-500 ${
+            playing ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-500/10 text-emerald-300"
+          }`}>
+            <Volume2 size={18} className={playing ? "animate-bounce" : ""} />
           </span>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">Voice News</p>
@@ -143,8 +164,8 @@ export const AudioStoryPlayer = ({
         <button
           type="button"
           onClick={togglePlayback}
-          className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
-            playing ? "bg-emerald-600 hover:bg-emerald-500" : "bg-orange-500 hover:bg-orange-400"
+          className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition-all duration-300 ${
+            playing ? "bg-emerald-600 hover:bg-emerald-500 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "bg-orange-500 hover:bg-orange-400 hover:shadow-[0_0_15px_rgba(249,115,22,0.3)]"
           }`}
           aria-label={playing ? `Pause ${label}` : `Play ${label}`}
         >
@@ -163,7 +184,7 @@ export const AudioStoryPlayer = ({
       <audio
         ref={audioRef}
         src={article.audioUrl}
-        crossOrigin="anonymous"
+        crossOrigin={isCrossOrigin ? undefined : "anonymous"}
         preload="metadata"
         onLoadedMetadata={(event) => {
           const metadataDuration = Number(event.currentTarget.duration);
@@ -181,11 +202,12 @@ export const AudioStoryPlayer = ({
         }}
         onPlay={() => {
           setPlaying(true);
-          if (analysisEnabled) {
+          if (analysisEnabled && !isCrossOrigin) {
             beginAudioAnalysis();
           }
         }}
-        onError={() => {
+        onError={(e) => {
+          console.error("Audio playback error:", e);
           setPlaying(false);
           cleanupAudioAnalysis();
           setAnalysisEnabled(false);

@@ -18,6 +18,12 @@ export const sendEmail = async ({ to, subject, html, attachments }) => {
           user: process.env.SMTP_USER,
           pass: cleanPass,
         },
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 20000,
+        greetingTimeout: 20000,
+        socketTimeout: 30000
       });
     } else {
       // Use Ethereal test account if SMTP is not configured

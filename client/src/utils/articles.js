@@ -31,6 +31,7 @@ export const getArticleSharePreviewUrl = (slug) => `${stripTrailingSlash(runtime
 
 export const getWhatsAppShareLink = ({ slug, title }) => {
   const shareUrl = getArticleSharePreviewUrl(slug);
-  const message = [shareUrl, String(title || "").trim()].filter(Boolean).join("\n");
+  const cleanTitle = String(title || "").trim();
+  const message = `🔥 *ब्रेकिंग न्यूज़: ${cleanTitle}*\n\nपूरी खबर पढ़ने और वीडियो/ऑडियो देखने के लिए यहाँ क्लिक करें 👇\n👉 ${shareUrl}\n\n📰 *पलामू एक्सप्रेस - झारखंड की आवाज़*`;
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 };

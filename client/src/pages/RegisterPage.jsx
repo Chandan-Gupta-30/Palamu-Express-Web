@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, X, User, Mail, Phone, Lock, Globe, MapPin, Award, ShieldCheck, CheckCircle, ArrowRight, ArrowLeft, BookOpen, Heart } from "lucide-react";
 import { http } from "../api/http";
 import { ImagePicker } from "../components/onboarding/ImagePicker";
-import { WebcamCapture } from "../components/onboarding/WebcamCapture";
 import { ActionPopup } from "../components/ui/ActionPopup";
 import { jharkhandBlocksByDistrict, jharkhandDistricts } from "../data/districts";
 import { TermsModal } from "../components/onboarding/TermsModal";
@@ -323,16 +322,12 @@ export const RegisterPage = () => {
       }
     }
     
-    if (form.role === "reporter" && !String(form.profilePhotoUrl || "").trim()) {
+    if ((form.role === "reporter" || form.role === "chief_editor") && !String(form.profilePhotoUrl || "").trim()) {
       return "Please upload your professional profile headshot for the press badge.";
     }
     
-    if (form.role === "reporter" && !String(form.aadhaarImageUrl || "").trim()) {
+    if ((form.role === "reporter" || form.role === "chief_editor") && !String(form.aadhaarImageUrl || "").trim()) {
       return "Please upload your scanned Aadhaar card for KYC verification.";
-    }
-    
-    if (form.role === "chief_editor" && !String(form.livePhotoUrl || "").trim()) {
-      return "Please capture a live camera photo to proceed with editor registration.";
     }
     
     return "";
@@ -815,7 +810,7 @@ export const RegisterPage = () => {
                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Supporting Media Documents</h4>
                     </div>
 
-                    {isReporter && (
+                    {(isReporter || isChiefEditor) && (
                       <div className="grid gap-4 sm:grid-cols-2">
                         <ImagePicker
                           label="Badge Profile Photo"
@@ -830,13 +825,6 @@ export const RegisterPage = () => {
                           onChange={(val) => setForm({ ...form, aadhaarImageUrl: val })}
                         />
                       </div>
-                    )}
-
-                    {isChiefEditor && (
-                      <WebcamCapture
-                        value={form.livePhotoUrl}
-                        onCapture={(val) => setForm({ ...form, livePhotoUrl: val })}
-                      />
                     )}
                   </div>
                 )}

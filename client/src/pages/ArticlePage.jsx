@@ -403,8 +403,8 @@ export const ArticlePage = () => {
           </div>
           
           {ad.imageUrl && (
-            <div className="w-full md:w-48 h-28 flex-shrink-0 rounded-2xl overflow-hidden border border-white/10 shadow-inner group relative">
-              <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            <div className="w-full md:w-48 h-28 flex-shrink-0 rounded-2xl overflow-hidden border border-white/10 shadow-inner bg-slate-950/50 group relative flex items-center justify-center">
+              <img src={ad.imageUrl} alt={ad.title} className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-105" />
               {ad.targetUrl && (
                 <a
                   href={ad.targetUrl}

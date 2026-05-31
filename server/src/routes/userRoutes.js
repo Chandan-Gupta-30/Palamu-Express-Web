@@ -11,6 +11,8 @@ import {
   updateUserByAdmin,
   verifyUserByCode,
   downloadIdCard,
+  downloadAppointmentLetter,
+  downloadAuthorizationLetter,
 } from "../controllers/userController.js";
 import { authorize, protect } from "../middlewares/auth.js";
 import { roles } from "../utils/constants.js";
@@ -19,6 +21,8 @@ const router = Router();
 
 router.get("/verify/:code", verifyUserByCode);
 router.get("/download-card/:id", downloadIdCard);
+router.get("/download-appt/:id", downloadAppointmentLetter);
+router.get("/download-auth/:id", downloadAuthorizationLetter);
 router.get("/me", protect, getMe);
 router.patch("/me/credentials", protect, updateMyCredentials);
 router.get("/id-card", protect, authorize(roles.REPORTER, roles.CHIEF_EDITOR), getStaffCard);

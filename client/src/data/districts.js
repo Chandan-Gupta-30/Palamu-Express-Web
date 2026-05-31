@@ -64,6 +64,7 @@ export const newsCategories = [
   "sports",
   "business",
   "technology",
+  "community",
   "other",
 ];
 
@@ -79,6 +80,7 @@ export const newsCategoryLabels = {
   sports: "Sports",
   business: "Business",
   technology: "Technology",
+  community: "Community & Panchayat Meetings",
   other: "Other",
 };
 

@@ -98,23 +98,18 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  if (role === roles.REPORTER && (!profilePhotoUrl || !aadhaarImageUrl)) {
+  if ([roles.REPORTER, roles.CHIEF_EDITOR].includes(role) && (!profilePhotoUrl || !aadhaarImageUrl)) {
     return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
-      message: "Reporter onboarding requires profile photo and Aadhaar image",
-    });
-  }
-
-  if (role === roles.CHIEF_EDITOR && !livePhotoUrl) {
-    return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
-      message: "Chief editor onboarding requires a live captured photo",
+      message: "Onboarding requires a badge profile photo and Aadhaar card KYC image",
     });
   }
 
   const otpCode = createOtpCode();
+  const actualLivePhoto = livePhotoUrl || profilePhotoUrl;
   const [storedProfilePhotoUrl, storedAadhaarImageUrl, storedLivePhotoUrl] = await Promise.all([
     uploadBase64Asset(profilePhotoUrl, "palamu-express/profile"),
     uploadBase64Asset(aadhaarImageUrl, "palamu-express/aadhaar"),
-    uploadBase64Asset(livePhotoUrl, "palamu-express/live-photo"),
+    uploadBase64Asset(actualLivePhoto, "palamu-express/live-photo"),
   ]);
 
   let firebaseUid = null;
@@ -174,16 +169,19 @@ export const register = asyncHandler(async (req, res) => {
 
   if ([roles.REPORTER, roles.CHIEF_EDITOR].includes(role)) {
     try {
-      const newNotif = await Notification.create({
-        userId: "all",
-        title: "New Onboarding Request",
-        message: `${fullName} is requesting onboarding approval as a ${role === roles.CHIEF_EDITOR ? "Chief Editor" : "Reporter"} in ${district} | ${area}.`,
-        type: "broadcast",
-        senderId: String(user._id),
-        createdAt: Date.now(),
-        onboardingUserId: String(user._id),
-      });
-      req.io?.emit("notification:received", { notification: newNotif });
+      const superAdmins = await User.find({ role: roles.SUPER_ADMIN });
+      for (const admin of superAdmins) {
+        const newNotif = await Notification.create({
+          userId: String(admin._id),
+          title: "New Onboarding Request",
+          message: `${fullName} is requesting onboarding approval as a ${role === roles.CHIEF_EDITOR ? "Chief Editor" : "Reporter"} in ${district} | ${area}.`,
+          type: "direct",
+          senderId: String(user._id),
+          createdAt: Date.now(),
+          onboardingUserId: String(user._id),
+        });
+        req.io?.to(`user:${admin._id}`).emit("notification:received", { notification: newNotif });
+      }
     } catch (notifErr) {
       console.error("Failed to trigger onboarding notification:", notifErr);
     }
@@ -317,94 +315,51 @@ export const sendEmailOtp = asyncHandler(async (req, res) => {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: "Please provide a valid email address." });
   }
 
-  // Prevent duplicate registration: check if email is already registered
-  const existingEmailUser = await User.findOne({
-    $or: [
-      { email: email },
-      { email: String(req.body.email || "").trim() }
-    ]
-  });
-  if (existingEmailUser) {
-    return res.status(StatusCodes.CONFLICT).json({
-      message: "This email address is already registered. Please sign in or use another email.",
-    });
-  }
-
   const otp = createOtpCode();
   await saveEmailOtp(email, otp);
 
-  let previewUrl = null;
-  let transporter = null;
+  // Print in the server console for easy development debugging
+  console.log(`[Development Debug] Generated Email OTP for ${email}: ${otp}`);
 
-  try {
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      const isGmail = String(process.env.SMTP_HOST).toLowerCase().includes("gmail");
-      const cleanPass = isGmail 
-        ? String(process.env.SMTP_PASS).replace(/\s+/g, "") 
-        : process.env.SMTP_PASS;
+  const emailHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 20px; padding: 40px; background-color: #ffffff;">
+      <h1 style="color: #ea580c; text-align: center; text-transform: uppercase; margin: 0; font-size: 28px; font-weight: bold; tracking: 1px;">Palamu Express</h1>
+      <h2 style="color: #0f172a; text-align: center; margin-top: 15px; font-size: 20px;">Email Onboarding Verification</h2>
+      <p style="font-size: 15px; line-height: 1.6; color: #334155; text-align: center; margin-top: 20px;">
+        Thank you for enrolling in the Palamu Express Digital Media portal. Please use the secure 6-digit OTP code below to verify your email address to complete your registration request:
+      </p>
+      <div style="text-align: center; margin: 30px 0;">
+        <span style="font-family: monospace; font-size: 38px; font-weight: bold; color: #ea580c; letter-spacing: 8px; border: 2px dashed #f97316; padding: 12px 28px; border-radius: 14px; background-color: #fff7ed; display: inline-block;">
+          ${otp}
+        </span>
+      </div>
+      <p style="font-size: 13px; color: #64748b; text-align: center; margin-top: 30px; line-height: 1.5;">
+        This secure verification code is valid for 10 minutes. If you did not request this verification, you can safely ignore this correspondence.
+      </p>
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 35px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center;">
+        Palamu Express Digital Media Portal © 2026. All rights reserved.
+      </p>
+    </div>
+  `;
 
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: process.env.SMTP_SECURE === "true",
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: cleanPass,
-        },
-      });
-    } else {
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
-    }
+  const emailResult = await sendEmail({
+    to: email,
+    subject: "Verify your email address - Palamu Express Digital Media",
+    html: emailHtml,
+  });
 
-    if (transporter) {
-      const fromEmail = process.env.SMTP_USER || "onboarding@palamuexpress.com";
-      const info = await transporter.sendMail({
-        from: `"Palamu Express News Desk" <${fromEmail}>`,
-        to: email,
-        subject: "Verify your email address - Palamu Express Digital Media",
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 20px; padding: 40px; background-color: #ffffff;">
-            <h1 style="color: #ea580c; text-align: center; text-transform: uppercase; margin: 0; font-size: 28px; font-weight: bold; tracking: 1px;">Palamu Express</h1>
-            <h2 style="color: #0f172a; text-align: center; margin-top: 15px; font-size: 20px;">Email Onboarding Verification</h2>
-            <p style="font-size: 15px; line-height: 1.6; color: #334155; text-align: center; margin-top: 20px;">
-              Thank you for enrolling in the Palamu Express Digital Media portal. Please use the secure 6-digit OTP code below to verify your email address to complete your registration request:
-            </p>
-            <div style="text-align: center; margin: 30px 0;">
-              <span style="font-family: monospace; font-size: 38px; font-weight: bold; color: #ea580c; letter-spacing: 8px; border: 2px dashed #f97316; padding: 12px 28px; border-radius: 14px; background-color: #fff7ed; display: inline-block;">
-                ${otp}
-              </span>
-            </div>
-            <p style="font-size: 13px; color: #64748b; text-align: center; margin-top: 30px; line-height: 1.5;">
-              This secure verification code is valid for 10 minutes. If you did not request this verification, you can safely ignore this correspondence.
-            </p>
-            <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 35px 0;" />
-            <p style="font-size: 11px; color: #94a3b8; text-align: center;">
-              Palamu Express Digital Media Portal © 2026. All rights reserved.
-            </p>
-          </div>
-        `,
-      });
-      if (info) {
-        previewUrl = nodemailer.getTestMessageUrl(info);
-      }
-    }
-  } catch (err) {
-    console.error("[Nodemailer Error] Could not send OTP email:", err.message);
+  if (!emailResult.success) {
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: `Failed to dispatch OTP email: ${emailResult.error || "Unknown transport error"}`
+    });
   }
 
   res.json({
     success: true,
     message: "A secure verification OTP code has been dispatched to your email address.",
-    previewUrl,
+    previewUrl: emailResult.previewUrl || null,
   });
 });
 

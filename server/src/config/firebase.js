@@ -90,11 +90,22 @@ const createMockFileRef = (fileName) => ({
 const cacheStore = {};
 const CACHE_TTL_MS = 60 * 1000; // Cache Firestore collections for 60 seconds
 
+// In-flight fetch promises to coalesce concurrent requests
+const activeCollectionFetches = {};
+const activeDocFetches = {};
+
 const invalidateCache = (colName) => {
   if (cacheStore[colName]) {
     delete cacheStore[colName];
-    console.log(`[Cache Invalidation] Cleared cache for collection "${colName}"`);
   }
+  // Clear any single document caches for this collection
+  const prefix = `${colName}/`;
+  Object.keys(cacheStore).forEach(key => {
+    if (key.startsWith(prefix)) {
+      delete cacheStore[key];
+    }
+  });
+  console.log(`[Cache Invalidation] Cleared cache for collection "${colName}" and its documents`);
 };
 
 const shouldInvalidate = (colName, docId, data) => {
@@ -161,20 +172,81 @@ const wrapFirestoreDbWithCaching = (rawDb) => {
             return cached.snapshot;
           }
 
+          // Return active fetch if already in flight
+          if (activeCollectionFetches[colName]) {
+            console.log(`[Cache Coalescing] Reusing active fetch promise for collection "${colName}"`);
+            return activeCollectionFetches[colName];
+          }
+
           console.log(`[Cache Miss] Fetching fresh documents from Firestore for collection "${colName}"`);
-          const snapshot = await rawCollection.get();
-          cacheStore[colName] = {
-            snapshot,
-            timestamp: now,
-          };
-          return snapshot;
+          const fetchPromise = rawCollection.get().then(snapshot => {
+            cacheStore[colName] = {
+              snapshot,
+              timestamp: Date.now(),
+            };
+            delete activeCollectionFetches[colName];
+            return snapshot;
+          }).catch(err => {
+            delete activeCollectionFetches[colName];
+            throw err;
+          });
+
+          activeCollectionFetches[colName] = fetchPromise;
+          return fetchPromise;
         },
 
         doc: (docId) => {
           const rawDoc = docId ? rawCollection.doc(docId) : rawCollection.doc();
           return {
             id: rawDoc.id,
-            get: () => rawDoc.get(),
+            get: async () => {
+              const now = Date.now();
+              const docCacheKey = `${colName}/${rawDoc.id}`;
+
+              // 1. First attempt to resolve from parent collection cache if fresh
+              const parentCached = cacheStore[colName];
+              if (parentCached && now - parentCached.timestamp < CACHE_TTL_MS) {
+                const foundDocSnap = parentCached.snapshot.docs?.find(d => d.id === rawDoc.id);
+                if (foundDocSnap) {
+                  console.log(`[Cache Hit] Serving document "${rawDoc.id}" from parent collection "${colName}" cache`);
+                  return {
+                    id: rawDoc.id,
+                    exists: true,
+                    data: () => foundDocSnap.data(),
+                    get: (field) => foundDocSnap.get(field),
+                  };
+                }
+              }
+
+              // 2. Resolve from single document cache
+              const docCached = cacheStore[docCacheKey];
+              if (docCached && now - docCached.timestamp < CACHE_TTL_MS) {
+                console.log(`[Cache Hit] Serving single document "${rawDoc.id}" from cache`);
+                return docCached.snapshot;
+              }
+
+              // 3. Resolve from active in-flight single document fetch
+              if (activeDocFetches[docCacheKey]) {
+                console.log(`[Cache Coalescing] Reusing active fetch promise for single document "${docCacheKey}"`);
+                return activeDocFetches[docCacheKey];
+              }
+
+              console.log(`[Cache Miss] Fetching fresh single document "${rawDoc.id}" from Firestore`);
+              const fetchPromise = rawDoc.get().then(snapshot => {
+                cacheStore[docCacheKey] = {
+                  snapshot,
+                  timestamp: Date.now(),
+                };
+                delete activeDocFetches[docCacheKey];
+                return snapshot;
+              }).catch(err => {
+                delete activeDocFetches[docCacheKey];
+                throw err;
+              });
+
+              activeDocFetches[docCacheKey] = fetchPromise;
+              return fetchPromise;
+            },
             set: async (data, options) => {
               if (shouldInvalidate(colName, rawDoc.id, data)) {
                 invalidateCache(colName);
@@ -234,7 +306,9 @@ const initializeFirebase = () => {
   const bucketName = env.firebase.storageBucket || (serviceAccount ? `${serviceAccount.project_id}.appspot.com` : "palamu-express-web.firebasestorage.app");
   const projectId = env.firebase.projectId || (serviceAccount ? serviceAccount.project_id : "palamu-express-web");
 
-  if (serviceAccount) {
+  const forceMock = process.env.FORCE_OFFLINE_MOCK === "true";
+
+  if (serviceAccount && !forceMock) {
     try {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
@@ -250,6 +324,8 @@ const initializeFirebase = () => {
     } catch (error) {
       console.error("[Firebase] Error initializing admin SDK with service account:", error.message);
     }
+  } else if (forceMock) {
+    console.log("[Firebase] FORCE_OFFLINE_MOCK environment variable is set to true. Forcing mock database mode.");
   }
 
 
